@@ -7,8 +7,10 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
     env_file = tmp_path / ".env"
     env_file.write_text(
         "OPENAI_API_KEY=test-openai-key\n"
+        "OPENAI_MODEL=gpt-test-model\n"
         "OPENAI_BASE_URL=https://llm.example.test/v1\n"
         "ANTHROPIC_API_KEY=test-anthropic-key\n"
+        "ANTHROPIC_MODEL=claude-test-model\n"
         "FORGE_DEFAULT_PROVIDER=anthropic\n"
         "FORGE_SANDBOX_ENABLED=true\n"
         "FORGE_SANDBOX_NETWORK=none\n"
@@ -21,8 +23,10 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
     settings = Settings(_env_file=env_file)
 
     assert settings.openai_api_key == "test-openai-key"
+    assert settings.openai_model == "gpt-test-model"
     assert settings.openai_base_url == "https://llm.example.test/v1"
     assert settings.anthropic_api_key == "test-anthropic-key"
+    assert settings.anthropic_model == "claude-test-model"
     assert settings.default_provider == "anthropic"
     assert settings.sandbox_enabled is True
     assert settings.sandbox_network == "none"
