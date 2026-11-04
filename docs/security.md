@@ -18,6 +18,10 @@ User goals, AgentForge profiles, skills, reference files, workflow playbooks, mo
 - Read-only AgentForge roles do not copy sandbox changes back to the project; read-write roles may copy back only new/modified regular files after path and symlink checks.
 - Sandbox deletions and symlink changes are not propagated.
 - HTTP API binds to localhost by default; non-loopback requests require an API token.
+- MCP credentials and OAuth refresh tokens are stored in the operating-system credential store through Forge MCP; there is no plaintext-file fallback.
+- MCP connection manifests contain endpoint/command metadata and keyring references only, never credential values.
+- Only explicitly enabled MCP servers are exposed to model providers. Remote connections require HTTPS; local STDIO commands execute on the host only after enablement.
+- MCP tool descriptions and results are untrusted model context. Tool calls are bounded by the provider's existing round/call budgets; credential values remain inside the connector process.
 
 ## Workspace permission model
 
@@ -35,7 +39,7 @@ The project snapshot is sanitized, but project code and dependencies can still b
 
 ## Not implemented
 
-There is no Git commit/push, deletion propagation, browser, deployment, arbitrary MCP tool, durable approval state machine or tenant-level authorization for all runtime data. The baseline evaluator checks output presence and size; it is not proof of semantic correctness or security.
+There is no Git commit/push, deletion propagation, browser automation, deployment adapter, durable approval state machine or tenant-level authorization for all runtime data. MCP connections are local integrations, not a hosted multi-tenant credential service. The baseline evaluator checks output presence and size; it is not proof of semantic correctness or security.
 
 ## Required before production use
 
@@ -45,3 +49,4 @@ There is no Git commit/push, deletion propagation, browser, deployment, arbitrar
 4. Encrypt sensitive artifacts and define retention/deletion controls.
 5. Test prompt injection at registry, planner, hand-off, filesystem and tool-result boundaries.
 6. Add tool provenance, audit log redaction, quotas, rate limits and provider cost budgets.
+7. Add a per-tool approval state machine for destructive or externally visible MCP operations.
