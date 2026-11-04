@@ -5,9 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import webbrowser
-from collections.abc import Awaitable
 from contextlib import asynccontextmanager
-from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
