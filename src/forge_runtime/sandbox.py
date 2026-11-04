@@ -7,6 +7,7 @@ AgentForge roles with read-write permission.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import os
@@ -132,9 +133,7 @@ class DockerSandboxExecutor:
             return True
         if filename.startswith(".env.") and filename != ".env.example":
             return True
-        if Path(filename).suffix.lower() in self.SENSITIVE_SUFFIXES:
-            return True
-        return False
+        return Path(filename).suffix.lower() in self.SENSITIVE_SUFFIXES
 
     def _copy_workspace(self, destination: Path) -> dict[str, str]:
         """Copy safe regular files and return their content-hash manifest."""
@@ -347,13 +346,11 @@ class DockerSandboxExecutor:
         if uid == 0:
             uid, gid = 10001, 10001
             if hasattr(os, "chown"):
-                for base, dirs, files in os.walk(snapshot):
+                for base, _dirs, files in os.walk(snapshot):
                     os.chown(base, uid, gid)
                     for name in files:
-                        try:
+                        with contextlib.suppress(OSError):
                             os.chown(Path(base) / name, uid, gid, follow_symlinks=False)
-                        except OSError:
-                            pass
 
         args = [
             "run", "--rm", "--pull=never", "--name", container_name,
@@ -403,7 +400,6 @@ class DockerSandboxExecutor:
     ) -> tuple[int, str, str, bool, bool]:
         container_name = f"forge-task-{uuid.uuid4().hex[:16]}"
         args = [self.docker_binary, *self._docker_args(snapshot, container_name=container_name), *argv]
-        started = time.monotonic()
         try:
             process = await asyncio.create_subprocess_exec(
                 *args,
