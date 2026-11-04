@@ -24,7 +24,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
 - **Parallel scheduler:** independent tasks run concurrently under a configurable semaphore.
 - **Dependency context:** successful outputs are passed to tasks that depend on them.
 - **Workspace tools:** OpenAI and Anthropic agents can list, read, search and (for `read-write` roles) write files in a configured project workspace.
-- **Sandbox executor:** LLM agents can run tests, linters and build commands in disposable offline Docker containers with resource limits and controlled change-back.
+- **Sandbox executor:** LLM agents can run tests, install dependencies and use the internet from disposable Docker containers with resource limits and controlled change-back.
 - **Retries and deadlines:** bounded attempts and per-task timeouts.
 - **Failure propagation:** tasks that depend on failed work are marked blocked.
 - **Evaluation:** baseline output validation behind a replaceable evaluator contract.
@@ -61,7 +61,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
                  Run report + event history
 ```
 
-AgentForge profiles and skills are untrusted model context, not executable permissions. OpenAI and Anthropic providers can modify ordinary files only inside `FORGE_WORKSPACE_ROOT`, and only when the selected role is `read-write`. This version does not include shell/process execution, Git commit/push, browser, deployment or arbitrary MCP tools.
+AgentForge profiles and skills are untrusted model context, not executable permissions. OpenAI and Anthropic providers can modify ordinary files only inside `FORGE_WORKSPACE_ROOT`, and only when the selected role is `read-write`. Commands run inside Docker, never directly on the host. Git commit/push, browser, deployment and arbitrary MCP tools are not provided.
 
 ## Requirements
 
@@ -77,10 +77,26 @@ cd forge-runtime
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev,openai,api]"
-cp .env.example .env
 ```
 
 The dependency installation also installs `agentforge-toolkit==1.1.0`. No separate AgentForge clone is required for the standard configuration.
+
+
+## Quick start — two commands after installation
+
+From the project directory, run:
+
+```bash
+# Prompts for your OpenAI key, saves it safely in .env, and builds the Docker image
+forge setup
+
+# Give Forge a task; agents can edit files, install dependencies and access the internet
+forge run "Inspect this project, implement the missing features and run the tests"
+```
+
+Use `forge setup --provider anthropic` for Anthropic, or `forge setup --provider mock` for a no-key demo. Setup builds the sandbox image only once; later runs reuse it.
+
+The sandbox uses Docker's `bridge` network by default, which enables outbound internet access for commands such as `curl`, `wget`, `pip install`, `npm install` and Git operations. Set `FORGE_SANDBOX_NETWORK=none` in `.env` to run offline.
 
 ## First run — mock provider
 
