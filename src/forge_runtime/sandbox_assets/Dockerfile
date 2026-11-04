@@ -35,8 +35,10 @@ ENV HOME=/tmp \
     TMPDIR=/tmp \
     PATH=/usr/local/bin:/usr/bin:/bin
 
+RUN mkdir -p /opt/forge-node_modules
+
 WORKDIR /workspace
 
 # The runtime overrides UID/GID, drops Linux capabilities, disables networking,
-# mounts the root filesystem read-only and only bind-mounts a sanitized project copy.
+# mounts the root filesystem read-only and transfers a sanitized project snapshot to tmpfs.
 CMD ["python", "--version"]
