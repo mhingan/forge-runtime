@@ -58,6 +58,7 @@ class SkillDefinition(BaseModel):
     description: str
     path: str
     content: str = ""
+    references: dict[str, str] = Field(default_factory=dict)
 
 
 class TaskSpec(BaseModel):
