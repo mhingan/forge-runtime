@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 import httpx
 from forge_mcp.config import MCPConnection
 from pydantic import AnyUrl
+
 from forge_runtime.credentials import CredentialVault
 
 OAUTH_TIMEOUT_SECONDS = 300
