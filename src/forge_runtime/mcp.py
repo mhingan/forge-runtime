@@ -79,6 +79,14 @@ class MCPManager:
             try:
                 if connection.transport == "stdio":
                     env = _minimal_child_environment()
+                    process_home = Path.home() / ".forge" / "mcp-homes" / name
+                    if process_home.is_symlink():
+                        raise ValueError("Refusing to use a symlinked MCP process home.")
+                    process_home.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    os.chmod(process_home, 0o700)
+                    env["HOME"] = str(process_home)
+                    if os.name == "nt":
+                        env["USERPROFILE"] = str(process_home)
                     for variable, reference in (connection.env_refs or {}).items():
                         secret = self.vault.get(reference)
                         env[variable] = secret
