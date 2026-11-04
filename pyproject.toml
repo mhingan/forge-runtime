@@ -21,6 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 readme = "README.md"
+authors = [{ name = "Mihaita Hingan" }]
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
