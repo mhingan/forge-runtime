@@ -18,12 +18,24 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mhingan/forge-mcp
+          ref: foundation
+          path: packages/forge-mcp
+      - uses: actions/checkout@v4
+        with:
+          repository: mhingan/agent-forge
+          ref: forge-runner
+          path: packages/agent-forge
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install runtime, toolkit and test dependencies
-        run: python -m pip install -e ".[dev,api]"
+        run: |
+          python -m pip install -e packages/forge-mcp -e packages/agent-forge
+          python -m pip install -e ".[dev,api]"
       - name: Lint and import normalization
         run: |
           ruff check . --fix
@@ -35,12 +47,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mhingan/forge-mcp
+          ref: foundation
+          path: packages/forge-mcp
+      - uses: actions/checkout@v4
+        with:
+          repository: mhingan/agent-forge
+          ref: forge-runner
+          path: packages/agent-forge
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
       - name: Install Forge Runtime
-        run: python -m pip install -e ".[dev,api]"
+        run: |
+          python -m pip install -e packages/forge-mcp -e packages/agent-forge
+          python -m pip install -e ".[dev,api]"
       - name: Build disposable agent toolchain image
         run: forge sandbox build
       - name: Verify Docker image and daemon
