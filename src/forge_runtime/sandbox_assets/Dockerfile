@@ -46,6 +46,6 @@ RUN mkdir -p /opt/forge-node_modules
 
 WORKDIR /workspace
 
-# The runtime overrides UID/GID, drops Linux capabilities, and configures bridge/offline networking,
+# The runtime overrides UID/GID and drops Linux capabilities; Docker controls bridge/offline networking,
 # and transfers a sanitized snapshot to bounded tmpfs (not a host project bind mount).
 CMD ["python", "--version"]
