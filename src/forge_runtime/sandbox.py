@@ -240,18 +240,22 @@ class DockerSandboxExecutor:
             raise SandboxError(f"Sandbox produced an unsafe output path: {relative_value}")
         if self._is_excluded(Path(*relative.parts)):
             raise SandboxError(f"Sandbox output path is protected: {relative_value}")
-        target = self.workspace.root.joinpath(*relative.parts)
-        parent = target.parent
-        parent.mkdir(parents=True, exist_ok=True)
         current = self.workspace.root
         for part in relative.parts[:-1]:
-            current = current / part
-            if current.is_symlink() or not current.is_dir():
-                raise SandboxError(f"Sandbox output parent is unsafe: {relative_value}")
+            candidate = current / part
+            if candidate.is_symlink():
+                raise SandboxError(f"Sandbox output parent is a symlink: {relative_value}")
+            if candidate.exists() and not candidate.is_dir():
+                raise SandboxError(f"Sandbox output parent is not a directory: {relative_value}")
+            if not candidate.exists():
+                candidate.mkdir()
+            current = candidate
+        parent = current
         try:
             parent.resolve().relative_to(self.workspace.root)
         except ValueError as exc:
             raise SandboxError(f"Sandbox output escapes workspace: {relative_value}") from exc
+        target = parent / relative.name
         if target.is_symlink():
             raise SandboxError(f"Refusing to replace workspace symlink: {relative_value}")
         return target
