@@ -47,7 +47,7 @@ When FORGE_SANDBOX_ENABLED is true, LLM providers also receive workspace_run_com
 5. Captures bounded stdout/stderr, exit code and elapsed duration.
 6. Hashes the snapshot before/after. New/changed regular files are copied back atomically only for read-write roles; deletions and symlinks are discarded.
 
-The image is built explicitly with forge sandbox build. Runtime execution uses --pull=never and does not fetch images. The default image includes Python and Node test/build tools. Project-specific dependencies can be included in a custom trusted Dockerfile. Runtime containers have no network, so package installation from remote registries is unavailable.
+The image is built explicitly with forge sandbox build. Runtime execution uses --pull=never and does not fetch images. The default image includes Python and Node test/build tools. Project-specific dependencies can be included in a custom trusted Dockerfile. Runtime containers use bridge networking by default, so package installation from remote registries is available. Offline mode is selectable with `FORGE_SANDBOX_NETWORK=none`.
 
 Docker is a container boundary, not a VM. The Docker daemon and host kernel remain trusted components.
 
