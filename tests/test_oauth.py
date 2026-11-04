@@ -20,13 +20,11 @@ async def test_loopback_oauth_callback_returns_authorization_code_and_state():
             b"Host: 127.0.0.1\r\nConnection: close\r\n\r\n"
         )
         await writer.drain()
-        result = await flow.callback_handler()
+        code, state = await flow.callback_handler()
         response = await reader.read()
         writer.close()
         await writer.wait_closed()
-        assert result.code == "authorization-code"
-        assert result.state == "expected-state"
-        assert result.iss is None
+        assert (code, state) == ("authorization-code", "expected-state")
         assert b"Authentication received" in response
     finally:
         await flow.close()
