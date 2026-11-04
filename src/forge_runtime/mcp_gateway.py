@@ -8,6 +8,7 @@ from typing import Any
 
 from forge_mcp.registry import MCPRegistry
 from mcp.server.fastmcp import FastMCP
+
 from forge_runtime.config import Settings
 from forge_runtime.mcp import MCPManager
 from forge_runtime.registry import AgentForgeRegistry
