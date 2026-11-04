@@ -10,7 +10,7 @@ class FakeSandboxExecutor(DockerSandboxExecutor):
 
     async def _run_container(self, snapshot, argv, timeout_seconds):
         if self.mode == "write":
-            (snapshot / "app.py").write_text("print('updated')\n", encoding="utf-8")
+            (snapshot / "src" / "app.py").write_text("print('updated')\n", encoding="utf-8")
             (snapshot / "new.py").write_text("VALUE = 42\n", encoding="utf-8")
             (snapshot / ".env").write_text("API_KEY=do-not-copy\n", encoding="utf-8")
             (snapshot / ".git").mkdir(exist_ok=True)
