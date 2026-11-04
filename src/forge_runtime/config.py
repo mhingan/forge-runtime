@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     sandbox_output_chars: int = Field(default=24000, ge=1000, le=100000)
     sandbox_max_snapshot_files: int = Field(default=5000, ge=1, le=50000)
     sandbox_max_snapshot_mb: int = Field(default=512, ge=1, le=4096)
+    mcp_enabled: bool = True
     default_provider: str = "mock"
     agentforge_repository: str = "https://github.com/mhingan/agent-forge"
     agentforge_ref: str = "main"
