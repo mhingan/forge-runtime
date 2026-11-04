@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -521,7 +522,7 @@ class DockerSandboxExecutor:
                 data["note"] = "Role is read-only; sandbox changes were discarded."
             elif result.applied_files:
                 data["note"] = "Changed files were copied back to the project workspace."
-            return str(data)
+            return json.dumps(data, ensure_ascii=False)
         except (SandboxError, WorkspaceError) as exc:
             return f"Sandbox error: {exc}"
 
