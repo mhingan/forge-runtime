@@ -11,8 +11,9 @@ User goals, AgentForge profiles, skills, reference files, workflow playbooks, mo
 - Tasks requiring human approval are rejected because no approval state machine is enabled.
 - Concurrency, attempts, task timeouts and output lengths are bounded.
 - Workspace tools are confined to FORGE_WORKSPACE_ROOT.
+- Secret environment files, credential files, private keys and sensitive credential directories are hidden from listing/search and cannot be read or written by agents.
 - Absolute paths, traversal and drive-qualified paths are rejected.
-- Workspace tools exclude dependency/build directories and block secret environment/private-key writes.
+- Workspace tools exclude dependency/build and credential directories; secret environment/credential/private-key files are hidden from listing and search and cannot be read or written.
 - AgentForge read-only roles do not receive the file-write tool.
 - Tool-call rounds, total tool calls, file sizes and search results are capped.
 - No shell, command execution, network, delete, deployment or arbitrary MCP tool is enabled.
