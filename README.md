@@ -255,7 +255,8 @@ See `.env.example`.
 | `FORGE_DATABASE_URL` | SQLite database URL | `sqlite:///./.forge/forge.db` |
 | `FORGE_WORKSPACE_ROOT` | Project directory visible to the runtime | `.` |
 | `FORGE_SANDBOX_ENABLED` | Expose Docker command tool to LLM agents | `true` |
-| `FORGE_SANDBOX_IMAGE` | Prebuilt local Docker image name | `forge-runtime-sandbox:internet-v1` |\n| `FORGE_SANDBOX_NETWORK` | Sandbox network (`bridge` or `none`) | `bridge` |
+| `FORGE_SANDBOX_IMAGE` | Prebuilt local Docker image name | `forge-runtime-sandbox:internet-v1` |
+| `FORGE_SANDBOX_NETWORK` | Sandbox network (`bridge` or `none`) | `bridge` |
 | `FORGE_SANDBOX_CPU_LIMIT` / `MEMORY_MB` | Per-container CPU and memory limits | `2` / `2048` |
 | `FORGE_SANDBOX_DEFAULT_TIMEOUT_SECONDS` | Default command timeout | `180` |
 | `FORGE_AGENTFORGE_SOURCE` | Registry source selection | `auto` |
