@@ -24,6 +24,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
 - **Parallel scheduler:** independent tasks run concurrently under a configurable semaphore.
 - **Dependency context:** successful outputs are passed to tasks that depend on them.
 - **Workspace tools:** OpenAI and Anthropic agents can list, read, search and (for `read-write` roles) write files in a configured project workspace.
+- **Sandbox executor:** LLM agents can run tests, linters and build commands in disposable offline Docker containers with resource limits and controlled change-back.
 - **Retries and deadlines:** bounded attempts and per-task timeouts.
 - **Failure propagation:** tasks that depend on failed work are marked blocked.
 - **Evaluation:** baseline output validation behind a replaceable evaluator contract.
@@ -132,6 +133,7 @@ OpenAI and Anthropic providers expose bounded workspace tools during specialist 
 | `workspace_read_file` | Read UTF-8 source files | read-only and read-write |
 | `workspace_search_files` | Search source text | read-only and read-write |
 | `workspace_write_file` | Create or replace UTF-8 files | read-write only |
+| `workspace_run_command` | Run allowlisted developer commands in isolated Docker | read-only and read-write |
 
 The default workspace is the directory from which `forge` is launched. Set `FORGE_WORKSPACE_ROOT` to select a specific project. The runtime confines paths to that root and rejects traversal paths, drive-qualified paths, symlinks that escape the root, secret environment files and private-key files. It excludes common dependency/build directories and caps file sizes, search results, tool rounds and total tool calls.
 
@@ -143,7 +145,36 @@ export OPENAI_API_KEY="..."
 forge run "Inspect the project, implement a responsive settings page, and add tests" --provider openai
 ```
 
-The model can read and write files through workspace tools, but cannot run shell commands or execute tests in this version. The final response must identify tests that remain unrun. Mock mode never modifies files. Review the resulting diff before using changes in production.
+The model can read and write files through workspace tools. Command execution is a separate Docker capability described below. Mock mode never modifies files. Review the resulting diff before using changes in production.
+
+## Sandboxed command execution
+
+Install and start Docker Desktop or Docker Engine. The first setup builds a local toolchain image; the build downloads its base image and Python packages, but **agent containers have no network access**.
+
+```bash
+# Check the Docker daemon and configured image
+forge sandbox check
+
+# Build forge-runtime-sandbox:latest once
+forge sandbox build
+
+# Smoke-test the image
+forge sandbox run -- python --version
+forge sandbox run -- pytest --version
+
+# Run the project's tests in a disposable container
+forge sandbox run -- python -m pytest
+```
+
+The LLM providers expose `workspace_run_command`. The tool accepts an argv array, not a raw shell string. Typical commands include `python -m pytest`, `ruff check .`, `mypy`, `npm test`, `node --test` and `make test`. Shells (`bash`/`sh`) are available inside the container for project scripts, but never on the host.
+
+The sandbox runs with networking disabled, a read-only container root filesystem, dropped Linux capabilities, `no-new-privileges`, a non-root UID, PID/CPU/memory limits, an execution timeout and capped output. Only a sanitized temporary copy of the project is mounted. It excludes `.git`, environment secrets, credentials, private keys, dependency folders and common build caches. Existing `node_modules` can be mounted read-only for offline Node.js tests. No host API keys or environment variables are forwarded.
+
+For AgentForge `read-write` roles, newly created or modified regular files are copied back after the command. Deletions and symlinks are not copied back. For `read-only` roles, all container changes are discarded. A failed test command still returns stdout, stderr and its exit code so the agent can diagnose, fix and rerun.
+
+The default image includes Python, pytest, Ruff, mypy, Node.js/npm, Git and common build tools. Projects requiring additional Python, Node or system libraries should customize `src/forge_runtime/sandbox_assets/Dockerfile`, rebuild the image and set `FORGE_SANDBOX_IMAGE` if using a different tag. Runtime containers never pull missing images automatically; run `forge sandbox build` explicitly.
+
+Set `FORGE_SANDBOX_ENABLED=false` to remove command execution from model tool schemas. This is a Docker container boundary, not a VM: run Docker Engine on a trusted host, keep it patched and review agent changes before merging.
 
 ## Registry source selection
 
@@ -206,7 +237,11 @@ See `.env.example`.
 | `FORGE_MAX_PARALLEL_TASKS` | Max concurrent tasks | `4` |
 | `FORGE_TASK_TIMEOUT_SECONDS` | Per-task timeout ceiling | `900` |
 | `FORGE_DATABASE_URL` | SQLite database URL | `sqlite:///./.forge/forge.db` |
-| `FORGE_WORKSPACE_ROOT` | Root directory visible to LLM workspace tools | `.` |
+| `FORGE_WORKSPACE_ROOT` | Project directory visible to the runtime | `.` |
+| `FORGE_SANDBOX_ENABLED` | Expose Docker command tool to LLM agents | `true` |
+| `FORGE_SANDBOX_IMAGE` | Prebuilt local Docker image name | `forge-runtime-sandbox:latest` |
+| `FORGE_SANDBOX_CPU_LIMIT` / `MEMORY_MB` | Per-container CPU and memory limits | `2` / `2048` |
+| `FORGE_SANDBOX_DEFAULT_TIMEOUT_SECONDS` | Default command timeout | `180` |
 | `FORGE_AGENTFORGE_SOURCE` | Registry source selection | `auto` |
 | `OPENAI_API_KEY` | OpenAI key | unset |
 | `ANTHROPIC_API_KEY` | Anthropic key | unset |
@@ -217,7 +252,9 @@ See `.env.example`.
 - All user goals, registry files and model outputs are treated as untrusted content.
 - Plans are validated against installed AgentForge role and skill names before any task runs.
 - The scheduler enforces bounded concurrency, retries and timeouts.
-- OpenAI and Anthropic agents can change ordinary files only inside `FORGE_WORKSPACE_ROOT` and only with a `read-write` role; secrets are hidden/protected. There is no shell, test runner, Git commit/push, deployment or arbitrary MCP tool.
+- OpenAI and Anthropic agents can change ordinary files only inside `FORGE_WORKSPACE_ROOT` and only with a `read-write` role; secrets are excluded from workspace tools and sandbox snapshots.
+- Shell/test/build commands run only inside ephemeral offline Docker containers. This is container isolation, not a VM or protection from host-kernel/Docker-daemon vulnerabilities.
+- The sandbox does not provide Git commit/push, deployment, browser access or arbitrary MCP tools. Deletions are not copied back.
 - Tasks flagged as requiring human approval are rejected because the approval subsystem is not enabled yet.
 - SQLite is intended for local and single-process use; it is not a distributed job queue.
 - The baseline evaluator checks output presence and size; it is not a semantic correctness guarantee.
@@ -231,7 +268,7 @@ pytest
 ruff check . --fix && ruff check .
 ```
 
-See [architecture](docs/architecture.md), [provider contracts](docs/providers.md), [security](docs/security.md), [roadmap](ROADMAP.md) and [contributing](CONTRIBUTING.md).
+See [architecture](docs/architecture.md), [provider contracts](docs/providers.md), [sandbox details](docs/sandbox.md), [security](docs/security.md), [roadmap](ROADMAP.md) and [contributing](CONTRIBUTING.md).
 
 ## License
 
