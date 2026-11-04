@@ -5,6 +5,9 @@ import asyncio
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -80,6 +83,96 @@ def _update_dotenv(path: Path, values: dict[str, str]) -> None:
             os.unlink(temporary_name)
 
 
+def _setup_copilot() -> None:
+    """Install the Forge Runner profile and merge the local MCP gateway into VS Code."""
+    try:
+        from agentforge.core import data_root
+        agentforge_root = data_root()
+    except Exception as exc:
+        console.print(f"[red]AgentForge is unavailable:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    runner_profile = agentforge_root / "agents" / "forge-runner.md"
+    if not runner_profile.is_file():
+        console.print(
+            "[red]Forge Runner profile is missing.[/red] "
+            "Upgrade agentforge-toolkit to 1.2.1 or newer, then rerun this command."
+        )
+        raise typer.Exit(2)
+
+    command = [
+        sys.executable,
+        "-m",
+        "agentforge",
+        "install",
+        "--agent",
+        "copilot",
+        "--scope",
+        "project",
+        "--components",
+        "agents",
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.stdout.strip():
+        console.print(result.stdout.strip())
+    if result.returncode != 0:
+        if result.stderr.strip():
+            console.print(result.stderr.strip())
+        console.print("[red]Could not install the Forge Runner Copilot profile.[/red]")
+        raise typer.Exit(result.returncode or 1)
+
+    config_path = Path.cwd() / ".vscode" / "mcp.json"
+    if config_path.parent.is_symlink() or config_path.is_symlink():
+        console.print("[red]Refusing to update a symlinked VS Code MCP configuration.[/red]")
+        raise typer.Exit(2)
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            console.print(f"[red]Cannot read {config_path}:[/red] {exc}")
+            raise typer.Exit(2) from exc
+        if not isinstance(config, dict):
+            console.print("[red]VS Code MCP configuration must be a JSON object.[/red]")
+            raise typer.Exit(2)
+    else:
+        config = {}
+
+    servers = config.setdefault("servers", {})
+    if not isinstance(servers, dict):
+        console.print("[red]The servers property in VS Code MCP config must be an object.[/red]")
+        raise typer.Exit(2)
+    servers["forge"] = {
+        "type": "stdio",
+        "command": "forge",
+        "args": ["mcp", "serve"],
+    }
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=".mcp-config-",
+            dir=config_path.parent,
+            delete=False,
+        ) as temporary:
+            temporary.write(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_name = temporary.name
+        os.chmod(temporary_name, 0o644)
+        os.replace(temporary_name, config_path)
+    finally:
+        if temporary_name and os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+    console.print("[green]Forge MCP Gateway added to .vscode/mcp.json.[/green]")
+    console.print("[green]Forge Runner installed for GitHub Copilot.[/green]")
+    console.print("Reload VS Code, select the Forge Runner agent, and start describing the task.")
+
+
 @app.command("setup")
 def setup(
     provider: str = typer.Option(
@@ -87,8 +180,20 @@ def setup(
         "--provider",
         help="Model provider to configure: openai, anthropic or mock.",
     ),
+    ide: str | None = typer.Option(
+        None,
+        "--ide",
+        help="Install Forge integration for a coding agent, currently: copilot.",
+    ),
 ) -> None:
-    """Configure a provider and build the Docker sandbox in one step."""
+    """Configure a model provider and sandbox, or install a coding-agent integration."""
+    if ide is not None:
+        if ide.strip().lower() != "copilot":
+            console.print("[red]Supported IDE integration: copilot.[/red]")
+            raise typer.Exit(2)
+        _setup_copilot()
+        return
+
     normalized = provider.strip().lower()
     if normalized not in {"openai", "anthropic", "mock"}:
         console.print("[red]Provider must be openai, anthropic or mock.[/red]")
@@ -325,6 +430,29 @@ def workflow_list(
     for name in registry.workflows:
         console.print(f"- {name}")
 
+
+
+
+@app.command(
+    "mcp",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def mcp_command(ctx: typer.Context) -> None:
+    """Discover, configure, authenticate, and run MCP connections."""
+    from forge_mcp.cli import main as forge_mcp_main
+
+    raise typer.Exit(forge_mcp_main(ctx.args))
+
+
+@app.command(
+    "auth",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def auth_command(ctx: typer.Context) -> None:
+    """Store or delete integration credentials in the OS credential vault."""
+    from forge_mcp.cli import main as forge_mcp_main
+
+    raise typer.Exit(forge_mcp_main(["credential", *ctx.args]))
 
 @app.command("run")
 def run(
