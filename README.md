@@ -217,7 +217,7 @@ See `.env.example`.
 - All user goals, registry files and model outputs are treated as untrusted content.
 - Plans are validated against installed AgentForge role and skill names before any task runs.
 - The scheduler enforces bounded concurrency, retries and timeouts.
-- No host command execution, filesystem mutation, git write, deployment or MCP tool is available.
+- OpenAI and Anthropic agents can change ordinary files only inside `FORGE_WORKSPACE_ROOT` and only with a `read-write` role; secrets are hidden/protected. There is no shell, test runner, Git commit/push, deployment or arbitrary MCP tool.
 - Tasks flagged as requiring human approval are rejected because the approval subsystem is not enabled yet.
 - SQLite is intended for local and single-process use; it is not a distributed job queue.
 - The baseline evaluator checks output presence and size; it is not a semantic correctness guarantee.
