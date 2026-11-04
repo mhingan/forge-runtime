@@ -21,12 +21,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: mhingan/forge-mcp
-          ref: foundation
+          ref: main
           path: packages/forge-mcp
       - uses: actions/checkout@v4
         with:
           repository: mhingan/agent-forge
-          ref: forge-runner
+          ref: main
           path: packages/agent-forge
       - uses: actions/setup-python@v5
         with:
