@@ -127,8 +127,6 @@ def _connection_summary() -> list[dict[str, Any]]:
             "transport": item.transport,
             "enabled": item.enabled,
             "source": item.source,
-            "url": item.url,
-            "command": item.command,
             "allowed_tools": list(item.allowed_tools),
             "auth_mode": item.auth_mode,
         }
