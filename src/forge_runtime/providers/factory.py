@@ -15,11 +15,13 @@ def create_provider(name: str, settings: Settings):
             api_key=os.getenv("OPENAI_API_KEY", ""),
             model=settings.openai_model,
             base_url=settings.openai_base_url or os.getenv("OPENAI_BASE_URL"),
+            workspace_root=settings.workspace_root,
         )
     if normalized == "anthropic":
         from forge_runtime.providers.anthropic_provider import AnthropicProvider
         return AnthropicProvider(
             api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             model=settings.anthropic_model,
+            workspace_root=settings.workspace_root,
         )
     raise ValueError("Unsupported provider. Choose mock, openai, or anthropic.")
