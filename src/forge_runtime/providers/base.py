@@ -1,5 +1,6 @@
 """Provider protocol for plan generation and specialist task execution."""
 from typing import Protocol
+
 from forge_runtime.models import AgentRequest, AgentResult, ExecutionPlan
 
 
