@@ -30,3 +30,22 @@ jobs:
           ruff check .
       - name: Test
         run: pytest --cov=forge_runtime --cov-report=term-missing
+
+  sandbox-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Forge Runtime
+        run: python -m pip install -e ".[dev,api]"
+      - name: Build disposable agent toolchain image
+        run: forge sandbox build
+      - name: Verify Docker image and daemon
+        run: forge sandbox check
+      - name: Run complete suite inside offline sandbox
+        run: forge sandbox run -- bash -lc "PYTHONPATH=src python -m pytest -q"
+      - name: Lint inside offline sandbox
+        run: forge sandbox run -- ruff check src tests
