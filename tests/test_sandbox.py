@@ -76,6 +76,8 @@ def test_command_validation_rejects_unsafe_or_invalid_argv(argv) -> None:
         ["pytest", "-q"],
         ["ruff", "check", "."],
         ["npm", "test"],
+        ["curl", "-I", "https://pypi.org"],
+        ["wget", "-q", "-O", "-", "https://pypi.org"],
         ["bash", "-lc", "python -m pytest"],
     ],
 )
@@ -174,12 +176,19 @@ def test_docker_args_use_tmpfs_and_never_bind_mount_the_project(tmp_path: Path) 
         args[index + 1] for index, value in enumerate(args[:-1]) if value == "--tmpfs"
     ]
     assert any(value.startswith("/workspace:rw") for value in tmpfs_values)
-    mounts = [
-        args[index + 1] for index, value in enumerate(args[:-1]) if value == "--mount"
+    assert any(
+        value.startswith("/workspace/node_modules:rw")
+        for value in tmpfs_values
+    )
+    assert "--mount" not in args
+
+    offline_mounts = [
+        offline_args[index + 1]
+        for index, value in enumerate(offline_args[:-1])
+        if value == "--mount"
     ]
-    assert mounts
-    assert all("dst=/opt/forge-node_modules,readonly" in value for value in mounts)
-    assert all("dst=/workspace" not in value for value in mounts)
+    assert offline_mounts
+    assert all("dst=/opt/forge-node_modules,readonly" in value for value in offline_mounts)
 
 @pytest.mark.asyncio
 async def test_sandbox_rejects_output_exceeding_file_budget(tmp_path: Path) -> None:
