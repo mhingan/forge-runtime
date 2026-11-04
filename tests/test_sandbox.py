@@ -164,7 +164,10 @@ def test_docker_args_use_tmpfs_and_never_bind_mount_the_project(tmp_path: Path) 
     args = executor._docker_args(container_name="forge-test")
 
     assert "--network" in args
-    assert args[args.index("--network") + 1] == "none"
+    assert args[args.index("--network") + 1] == "bridge"
+    offline = DockerSandboxExecutor(root, network="none")
+    offline_args = offline._docker_args(container_name="forge-test-offline")
+    assert offline_args[offline_args.index("--network") + 1] == "none"
     assert "--read-only" in args
     assert args[args.index("--cap-drop") + 1] == "ALL"
     tmpfs_values = [
@@ -189,3 +192,10 @@ async def test_sandbox_rejects_output_exceeding_file_budget(tmp_path: Path) -> N
 
     assert (root / "src" / "app.py").read_text(encoding="utf-8") == "print('original')\n"
     assert not (root / "new.py").exists()
+
+
+
+@pytest.mark.parametrize("network", ["host", "container", "bad"])
+def test_sandbox_rejects_unsafe_network_modes(tmp_path: Path, network: str) -> None:
+    with pytest.raises(SandboxError, match="network"):
+        DockerSandboxExecutor(tmp_path, network=network)
