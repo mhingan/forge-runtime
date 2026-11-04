@@ -13,7 +13,10 @@
 - [x] SQLite run/task/event persistence
 - [x] CLI and optional local FastAPI control API
 - [x] Role-based workspace list/read/search/write tools for LLM providers
-- [x] Registry, graph, scheduler, API, workspace and storage test coverage
+- [x] Docker sandbox command tool with offline containers and resource limits
+- [x] Sanitized workspace snapshots with read-only/read-write result handling
+- [x] Sandbox CLI, bundled image, configuration and security tests
+- [x] Registry, graph, scheduler, API, workspace, sandbox and storage test coverage
 
 ## Production orchestration
 - [ ] Strict JSON Schema-constrained planning and bounded plan repair
@@ -25,8 +28,8 @@
 - [ ] Global concurrency limits and provider rate-limit backoff
 
 ## Execution plane
-- [ ] Ephemeral sandboxed shell/test execution
-- [ ] Task-level capability manifests
+- [ ] VM/microVM isolation for hostile multi-tenant workloads
+- [ ] Task-level capability manifests and human approval for destructive actions
 - [ ] Git worktree isolation and patch-based code integration
 - [ ] Human-reviewed artifact promotion
 - [ ] Artifact store, checksums and provenance
