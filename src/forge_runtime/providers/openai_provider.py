@@ -241,7 +241,7 @@ class OpenAIProvider:
             f"You are the specialist agent: {request.agent.name}.\n"
             f"AgentForge role profile:\n{request.agent.content[:18000]}\n\n"
             f"{permissions} File operations are confined to the configured workspace. "
-            "Command execution, when enabled, runs in an ephemeral Docker container with no "
+            "Command execution, when enabled, runs in an ephemeral Docker container with bridge internet access and no "
             "network and a sanitized project copy. Do not attempt path traversal, access secrets, "
             "or claim capabilities you do not have."
         )
