@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import re
 from typing import Any
 
+from forge_mcp.config import ConnectionStore, MCPConnection
 from forge_mcp.popular import popular_servers, popularity_metadata
 from forge_mcp.registry import MCPRegistry
 from mcp.server.fastmcp import FastMCP
@@ -54,7 +56,6 @@ server = FastMCP(
     ),
     lifespan=_gateway_lifespan,
 )
-_manager_instance: MCPManager | None = None
 
 
 async def _get_manager() -> MCPManager:
@@ -193,6 +194,101 @@ def forge_list_popular_servers(limit: int = 100) -> dict[str, Any]:
     return {
         "metadata": popularity_metadata(),
         "servers": popular_servers(limit),
+    }
+
+
+@server.tool()
+async def forge_connect_registry_server(
+    registry_name: str,
+    connection_name: str | None = None,
+    oauth_scope: str | None = None,
+) -> dict[str, Any]:
+    """Connect an official remote Streamable HTTP MCP server using browser OAuth PKCE.
+
+    Use this only after the user explicitly asks to connect the named integration and
+    after you have checked its registry publisher/repository. The identity provider
+    opens in the user's browser and asks the user to consent. This tool does not
+    install or execute local STDIO packages.
+    """
+    global _manager_instance
+    record = MCPRegistry().get(registry_name)
+    if not record.remotes:
+        return {
+            "connected": False,
+            "reason": "No remote endpoint is published. Local package servers must be installed and reviewed from the user's terminal.",
+            "registry_name": record.name,
+            "repository": record.repository or "",
+        }
+    remote = record.remotes[0]
+    remote_type = remote.get("type") or remote.get("transport")
+    url = remote.get("url")
+    if remote_type not in {"streamable-http", None}:
+        return {"connected": False, "reason": f"Remote transport {remote_type!r} is not supported."}
+    if not isinstance(url, str) or not url.startswith("https://"):
+        return {"connected": False, "reason": "The registry entry does not provide a secure HTTPS endpoint."}
+
+    derived_name = re.sub(r"[^a-zA-Z0-9_.-]", "-", record.name.split("/")[-1]).strip("-").lower()
+    name = connection_name or derived_name
+    if not name:
+        return {"connected": False, "reason": "A local connection name is required."}
+
+    store = ConnectionStore()
+    existing = store.load().get(name)
+    if existing is not None:
+        if existing.transport != "http" or existing.url != url:
+            return {
+                "connected": False,
+                "reason": f"Local connection name {name!r} already refers to a different server. Choose another name.",
+            }
+        if existing.header_refs:
+            return {
+                "connected": False,
+                "reason": "This connection already uses static HTTP credentials. Switch authentication from the terminal before using OAuth.",
+            }
+        values = existing.to_dict()
+    else:
+        values = MCPConnection(
+            name=name,
+            transport="http",
+            enabled=False,
+            url=url,
+            source=f"official-registry:{record.name}",
+        ).to_dict()
+    values["auth_mode"] = "oauth"
+    values["enabled"] = True
+    if oauth_scope is not None:
+        values["oauth_scope"] = oauth_scope
+    store.add(MCPConnection.from_dict(name, values), replace=True)
+
+    if _manager_instance is not None:
+        await _manager_instance.close()
+        _manager_instance = None
+    _manager_instance = await MCPManager(store=store).start()
+    status = _manager_instance.status()
+    if name not in status["connected_servers"]:
+        await _manager_instance.close()
+        _manager_instance = None
+        store.set_enabled(name, False)
+        error = next(
+            (item for item in status["startup_errors"] if item.startswith(f"{name}:")),
+            "The remote MCP server did not complete initialization.",
+        )
+        return {
+            "connected": False,
+            "server": name,
+            "reason": error,
+            "browser_auth": "not confirmed",
+        }
+    available = [item for item in _manager_instance.list_tools() if item["server"] == name]
+    return {
+        "connected": True,
+        "server": name,
+        "registry_name": record.name,
+        "repository": record.repository or "",
+        "tool_count": len(available),
+        "tools": [item["original_name"] for item in available],
+        "authentication": "OAuth 2.1 authorization code with PKCE",
+        "credential_storage": "OS credential vault",
     }
 
 
