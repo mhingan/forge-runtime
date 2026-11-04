@@ -22,10 +22,20 @@ class CredentialVault:
         except ImportError as exc:
             raise RuntimeError('Install the credential support: pip install "forge-agent-runtime"') from exc
         backend = keyring.get_keyring()
-        if getattr(backend, "priority", 0) <= 0:
+        module = type(backend).__module__
+        secure_backends = (
+            "keyring.backends.macOS",
+            "keyring.backends.Windows",
+            "keyring.backends.SecretService",
+            "keyring.backends.kwallet",
+        )
+        if getattr(backend, "priority", 0) <= 0 or not any(
+            module.startswith(prefix) for prefix in secure_backends
+        ):
             raise RuntimeError(
-                "No secure operating-system keyring is available. Configure macOS Keychain, "
-                "Windows Credential Manager, or a Linux Secret Service backend before storing secrets."
+                "No supported OS-backed keyring is available. Configure macOS Keychain, "
+                "Windows Credential Manager, KDE Wallet, or Linux Secret Service. "
+                "Forge refuses plaintext or fallback keyring backends."
             )
         return keyring
 
