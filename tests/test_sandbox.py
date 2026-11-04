@@ -177,3 +177,15 @@ def test_docker_args_use_tmpfs_and_never_bind_mount_the_project(tmp_path: Path) 
     assert mounts
     assert all("dst=/opt/forge-node_modules,readonly" in value for value in mounts)
     assert all("dst=/workspace" not in value for value in mounts)
+
+@pytest.mark.asyncio
+async def test_sandbox_rejects_output_exceeding_file_budget(tmp_path: Path) -> None:
+    root = make_workspace(tmp_path)
+    executor = FakeSandboxExecutor(root)
+    executor.max_snapshot_files = 3
+
+    with pytest.raises(SandboxError, match="file limit"):
+        await executor.run(["pytest", "-q"], writable=True)
+
+    assert (root / "src" / "app.py").read_text(encoding="utf-8") == "print('original')\\n"
+    assert not (root / "new.py").exists()
