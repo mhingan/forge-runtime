@@ -83,7 +83,7 @@ class OpenAIProvider:
 
     async def execute(self, request: AgentRequest) -> AgentResult:
         skills = [
-            {"name": skill.name, "description": skill.description, "content": skill.content[:8000]}
+            {"name": skill.name, "description": skill.description, "content": skill.content[:8000], "references": {name: text[:6000] for name, text in skill.references.items()}}
             for skill in request.skills
         ]
         prompt = (
