@@ -189,6 +189,7 @@ def test_docker_args_use_tmpfs_and_never_bind_mount_the_project(tmp_path: Path) 
     ]
     assert offline_mounts
     assert all("dst=/opt/forge-node_modules,readonly" in value for value in offline_mounts)
+    assert "--env" in args and "PIP_TARGET=/tmp/python-packages" in args
 
 @pytest.mark.asyncio
 async def test_sandbox_rejects_output_exceeding_file_budget(tmp_path: Path) -> None:
