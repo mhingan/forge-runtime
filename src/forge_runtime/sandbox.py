@@ -332,7 +332,9 @@ class DockerSandboxExecutor:
                     "snapshot, and CPU/memory/process/time limits are enforced. Use argv as "
                     "an array (not a shell command string). Changes are copied back only for "
                     "read-write roles. Common commands: python -m pytest, pytest, ruff check ., "
-                    "npm test, node --test, git status."
+                    "npm install && npm test, python -m pip install -r requirements.txt, "
+                    "curl, wget, node --test and git status. Each run is ephemeral; "
+                    "combine dependency installation and tests in one shell invocation."
                 ),
                 "parameters": {
                     "type": "object",
@@ -388,16 +390,25 @@ class DockerSandboxExecutor:
             "--shm-size", "64m",
             "--tmpfs", f"/workspace:rw,nosuid,nodev,size={workspace_tmpfs_mb}m,mode=1777",
             "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m,mode=1777",
+            "--env", "PIP_TARGET=/tmp/python-packages",
+            "--env", "PYTHONPATH=/tmp/python-packages",
+            "--env", "PIP_CACHE_DIR=/tmp/pip-cache",
             "--user", f"{uid}:{gid}",
             "--workdir", "/workspace",
             "--env", "HOME=/tmp",
             "--env", "TMPDIR=/tmp",
             "--env", "PYTHONDONTWRITEBYTECODE=1",
             "--env", "PYTEST_ADDOPTS=-p no:cacheprovider",
-            "--env", "PATH=/opt/forge-node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
+            "--env", "PATH=/workspace/node_modules/.bin:/tmp/python-packages/bin:/usr/local/bin:/usr/bin:/bin",
         ]
         dependencies = self.workspace.root / "node_modules"
-        if dependencies.is_dir() and not dependencies.is_symlink():
+        if self.network == "bridge":
+            # npm can install packages in this disposable writable volume during one command.
+            args.extend([
+                "--tmpfs",
+                "/workspace/node_modules:rw,nosuid,nodev,size=1024m,mode=1777",
+            ])
+        elif dependencies.is_dir() and not dependencies.is_symlink():
             args.extend([
                 "--mount",
                 f"type=bind,src={dependencies.resolve()},dst=/opt/forge-node_modules,readonly",
@@ -458,6 +469,7 @@ class DockerSandboxExecutor:
             "exec",
             container_name,
             "tar",
+            "--exclude=./node_modules",
             "-cf",
             "-",
             "-C",
@@ -628,7 +640,11 @@ class DockerSandboxExecutor:
                 with contextlib.suppress(OSError):
                     archive_path.unlink()
             dependencies = self.workspace.root / "node_modules"
-            if dependencies.is_dir() and not dependencies.is_symlink():
+            if (
+                self.network == "none"
+                and dependencies.is_dir()
+                and not dependencies.is_symlink()
+            ):
                 await self._run_control(
                     self.docker_binary,
                     "exec",
