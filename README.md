@@ -6,12 +6,13 @@ Forge Runtime turns one user goal into a validated multi-agent execution graph. 
 
 ## AgentForge integration
 
-Forge Runtime depends on the published distribution **agentforge-toolkit 1.1.0**. The toolkit exposes its bundled library directory through `agentforge.core.data_root()`; the runtime reads the catalogs and Markdown definitions from that packaged data.
+Forge Runtime depends on **agentforge-toolkit 1.2.1 or newer within the 1.x line** and the **forge-mcp-registry 0.2.x line**. The toolkit exposes its bundled library directory through `agentforge.core.data_root()`; the runtime reads the catalogs and Markdown definitions from that packaged data.
 
 | Project | Responsibility |
 |---|---|
-| [AgentForge](https://github.com/mhingan/agent-forge) / [PyPI](https://pypi.org/project/agentforge-toolkit/1.1.0/) | Agent roles, skills, rules, workflows, catalogs, provider-specific coding-agent installation |
-| **Forge Runtime** | Forge Master, planning, DAG scheduling, dispatch, model-provider calls, state, evaluation, API and execution reports |
+| [AgentForge](https://github.com/mhingan/agent-forge) / [PyPI](https://pypi.org/project/agentforge-toolkit/) | Agent roles including Forge Runner, skills, rules, workflows, catalogs, provider-specific coding-agent installation |
+| [Forge MCP](https://github.com/mhingan/forge-mcp) / [PyPI](https://pypi.org/project/forge-mcp-registry/) | Official MCP registry discovery, secure local credentials, remote/STDIO clients, and the single local gateway |
+| **Forge Runtime** | Forge Master, planning, DAG scheduling, dispatch, model-provider calls, MCP bridge, state, evaluation, API and execution reports |
 
 The runtime does not call an undocumented AgentForge registry class or assume the toolkit is a hosted service. The adapter uses the package's real `data_root()` entry point. A local repository checkout and GitHub raw source are also supported.
 
@@ -24,6 +25,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
 - **Parallel scheduler:** independent tasks run concurrently under a configurable semaphore.
 - **Dependency context:** successful outputs are passed to tasks that depend on them.
 - **Workspace tools:** OpenAI and Anthropic agents can list, read, search and (for `read-write` roles) write files in a configured project workspace.
+- **MCP tool bridge:** OpenAI and Anthropic agents discover and call tools from explicitly enabled local/remote MCP connections. Credentials are resolved by Forge MCP from the OS credential store and never inserted into prompts.
 - **Sandbox executor:** LLM agents can run tests, install dependencies and use the internet from disposable Docker containers with resource limits and controlled change-back.
 - **Retries and deadlines:** bounded attempts and per-task timeouts.
 - **Failure propagation:** tasks that depend on failed work are marked blocked.
@@ -61,7 +63,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
                  Run report + event history
 ```
 
-AgentForge profiles and skills are untrusted model context, not executable permissions. OpenAI and Anthropic providers can modify ordinary files only inside `FORGE_WORKSPACE_ROOT`, and only when the selected role is `read-write`. Commands run inside Docker, never directly on the host. Git commit/push, browser, deployment and arbitrary MCP tools are not provided.
+AgentForge profiles and skills are untrusted model context, not executable permissions. OpenAI and Anthropic providers can modify ordinary files only inside `FORGE_WORKSPACE_ROOT`, and only when the selected role is `read-write`. Commands run inside Docker, never directly on the host. MCP tools are available only from connections explicitly enabled by the user. Git commit/push, browser automation and deployment adapters are not provided yet.
 
 ## Requirements
 
@@ -79,7 +81,7 @@ source .venv/bin/activate
 python -m pip install -e ".[openai]"
 ```
 
-The dependency installation also installs `agentforge-toolkit==1.1.0`. No separate AgentForge clone is required for the standard configuration.
+The dependency installation also installs a compatible AgentForge Toolkit and Forge MCP Registry package. No separate AgentForge or Forge MCP clone is required for the standard configuration.
 
 
 ## Install from PyPI
@@ -89,6 +91,7 @@ Once the first release is published:
 ```bash
 python -m pip install "forge-agent-runtime[openai]"
 forge setup
+forge mcp search figma
 forge run "Inspect this project, implement the requested feature and run the tests"
 ```
 
@@ -106,7 +109,7 @@ forge setup
 forge run "Inspect this project, implement the missing features and run the tests"
 ```
 
-Use `forge setup --provider anthropic` for Anthropic, or `forge setup --provider mock` for a no-key demo. Setup builds the sandbox image only once; later runs reuse it.
+Use `forge setup --provider anthropic` for Anthropic, or `forge setup --provider mock` for a no-key demo. Setup builds the sandbox image only once; later runs reuse it. To install the Copilot custom agent and one local gateway configuration in the current project, run `forge setup --ide copilot`.
 
 The sandbox uses Docker's `bridge` network by default, which enables outbound internet access for commands such as `curl`, `wget`, `pip install`, `npm install` and Git operations. Set `FORGE_SANDBOX_NETWORK=none` in `.env` to run offline.
 
@@ -150,6 +153,35 @@ python -m pip install -e ".[anthropic]"
 ```
 
 The LLM providers have bounded workspace and Docker command tools, but no direct host shell or deployment access. Their command execution runs in disposable containers.
+
+## MCP integrations
+
+Forge MCP maintains one local connection manifest at `~/.forge/mcp.json`. Credentials and OAuth refresh tokens are stored in the operating-system credential vault, never in the manifest or model context. Connections are disabled by default and must be explicitly enabled.
+
+```bash
+# Search the official registry
+forge mcp search figma
+
+# Add a remote OAuth server (use the verified endpoint and scopes for that provider)
+forge mcp add-http figma https://mcp.figma.com/mcp --auth-mode oauth
+forge mcp enable figma
+forge mcp tools figma
+
+# Add a secret through a hidden terminal prompt
+forge auth set forge/figma/token
+
+# Add a remote bearer-auth server using a keyring reference
+forge mcp add-http service https://mcp.example.com/mcp --auth-mode bearer --credential-ref forge/service/token
+forge mcp enable service
+
+# List or disable connections
+forge mcp list
+forge mcp disable service
+```
+
+For local STDIO servers, use `forge mcp add-stdio`. Enabling one runs its command on the host, so inspect its publisher and arguments first. Remote endpoints require HTTPS. The bundled popularity catalogue is a GitHub-star discovery snapshot, not live search-volume rankings or a safety rating.
+
+OpenAI and Anthropic providers discover tool schemas from enabled connections and call them through the Forge MCP bridge. The credential vault resolves headers and environment variables inside the local connector; the model sees tool schemas and results, never credential values. The gateway is also available to compatible coding agents as one server: `forge mcp serve`.
 
 ## Workspace access for coding tasks
 
@@ -262,6 +294,7 @@ See `.env.example` and [the PyPI publishing guide](docs/publishing.md).
 | Variable | Purpose | Default |
 |---|---|---|
 | `FORGE_DEFAULT_PROVIDER` | Default model provider | `mock` |
+| `FORGE_MCP_ENABLED` | Expose enabled Forge MCP connections to OpenAI/Anthropic agents | `true` |
 | `FORGE_MAX_PARALLEL_TASKS` | Max concurrent tasks | `4` |
 | `FORGE_TASK_TIMEOUT_SECONDS` | Per-task timeout ceiling | `900` |
 | `FORGE_DATABASE_URL` | SQLite database URL | `sqlite:///./.forge/forge.db` |
@@ -283,7 +316,10 @@ See `.env.example` and [the PyPI publishing guide](docs/publishing.md).
 - The scheduler enforces bounded concurrency, retries and timeouts.
 - OpenAI and Anthropic agents can change ordinary files only inside `FORGE_WORKSPACE_ROOT` and only with a `read-write` role; secrets are excluded from workspace tools and sandbox snapshots.
 - Shell/test/build commands run only inside ephemeral Docker containers. Bridge mode provides outbound internet and may reach private/LAN destinations accessible from the Docker host. Use `none` for offline tasks. This is container isolation, not a VM or protection from host-kernel/Docker-daemon vulnerabilities.
-- The sandbox does not provide Git commit/push, deployment, browser access or arbitrary MCP tools. Deletions are not copied back.
+- The sandbox does not provide Git commit/push, deployment or browser automation. Deletions are not copied back.
+- MCP credentials are stored in the OS keychain/credential manager. There is no plaintext fallback; if no secure keyring backend is available, credential setup fails.
+- Enabling a remote MCP connection authorizes Runtime to expose its tools to agents. Review the publisher, OAuth scopes, tool descriptions and allowed actions first. Local STDIO commands execute on the host after enablement.
+- MCP server metadata, tool descriptions and tool results are untrusted. Prompt injection through tool output remains a risk; do not enable untrusted servers.
 - Tasks flagged as requiring human approval are rejected because the approval subsystem is not enabled yet.
 - SQLite is intended for local and single-process use; it is not a distributed job queue.
 - The baseline evaluator checks output presence and size; it is not a semantic correctness guarantee.
