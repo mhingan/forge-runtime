@@ -1,0 +1,19 @@
+"""Environment-backed settings."""
+from pathlib import Path
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FORGE_", env_file=".env", extra="ignore")
+    environment: str = "development"
+    log_level: str = "INFO"
+    database_url: str = "sqlite:///./.forge/forge.db"
+    max_parallel_tasks: int = Field(default=4, ge=1, le=64)
+    task_timeout_seconds: int = Field(default=900, ge=1, le=86400)
+    default_provider: str = "mock"
+    agentforge_repository: str = "https://github.com/mhingan/agent-forge"
+    agentforge_ref: str = "main"
+    agentforge_local_path: Path | None = None
+    openai_model: str = "gpt-4.1"
+    anthropic_model: str = "claude-sonnet-4-5"
