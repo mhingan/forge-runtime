@@ -39,6 +39,8 @@ class WorkspaceTools:
         pure = PurePosixPath(normalized)
         if pure.is_absolute() or any(part == ".." for part in pure.parts):
             raise WorkspaceError("Absolute paths and '..' traversal are not allowed.")
+        if pure.parts and ":" in pure.parts[0]:
+            raise WorkspaceError("Drive-qualified paths are not allowed.")
         if any(part in self.EXCLUDED_DIRS for part in pure.parts):
             raise WorkspaceError("This workspace path is excluded from agent access.")
         if not pure.parts or pure.as_posix() == ".":
