@@ -45,9 +45,9 @@ jobs:
         run: forge sandbox build
       - name: Verify Docker image and daemon
         run: forge sandbox check
-      - name: Run complete suite inside offline sandbox
+      - name: Verify internet access inside sandbox\n        run: forge sandbox run -- curl --fail --silent --show-error --max-time 15 -I https://pypi.org\n      - name: Run complete suite inside sandbox
         run: forge sandbox run -- bash -lc "PYTHONPATH=src python -m pytest -q"
-      - name: Lint inside offline sandbox
+      - name: Lint inside sandbox
         run: forge sandbox run -- ruff check src tests
       - name: Verify read-write sandbox changes are applied
         run: |
