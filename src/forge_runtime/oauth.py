@@ -5,13 +5,12 @@ from __future__ import annotations
 import asyncio
 import sys
 import webbrowser
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
-from pydantic import AnyUrl
-
 from forge_mcp.config import MCPConnection
+from pydantic import AnyUrl
 from forge_runtime.credentials import CredentialVault
 
 OAUTH_TIMEOUT_SECONDS = 300
@@ -131,10 +130,8 @@ class LoopbackOAuthFlow:
             pass
         finally:
             writer.close()
-            try:
+            with suppress(ConnectionError, OSError):
                 await writer.wait_closed()
-            except (ConnectionError, OSError):
-                pass
 
     async def redirect_handler(self, authorization_url: str) -> None:
         if self._result is None or self._result.done():
