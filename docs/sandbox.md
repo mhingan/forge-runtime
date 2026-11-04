@@ -2,7 +2,7 @@
 
 ## Why a separate executor exists
 
-LLM providers need a way to run tests, linters and project build commands after editing code. Executing those commands directly on the Forge Runtime host would grant the agent the host user's permissions. Forge Runtime instead creates a disposable Docker container for each command and mounts only a sanitized project snapshot.
+LLM providers need a way to run tests, linters and project build commands after editing code. Executing those commands directly on the Forge Runtime host would grant the agent the host user's permissions. Forge Runtime instead creates a disposable Docker container for each command and transfers only a sanitized project snapshot into a bounded tmpfs.
 
 This is a Docker container boundary, not a VM. Use it on a trusted, patched Docker host. Container isolation cannot protect against Docker daemon compromise, container escape vulnerabilities or malicious code that exploits the host kernel.
 
@@ -11,12 +11,10 @@ This is a Docker container boundary, not a VM. Use it on a trusted, patched Dock
 Install and start Docker Desktop or Docker Engine. Then, from the Forge Runtime environment:
 
 ```bash
-forge sandbox check
-forge sandbox build
-forge sandbox check
+forge setup
 ```
 
-The bundled image is `forge-runtime-sandbox:latest`. It contains Python 3.12, pytest, Ruff, mypy, coverage, uv, Node.js/npm, Git, bash, make and common build tools. The image build uses network access to download its base image and packages. Runtime agent containers do not have network access.
+The bundled image is `forge-runtime-sandbox:latest`. It contains Python 3.12, pytest, Ruff, mypy, coverage, uv, Node.js/npm, Git, curl, wget, bash, make and common build tools. `forge setup` builds the image once and prepares the provider configuration. Agent containers use Docker's `bridge` network by default, so commands can access the public internet.
 
 To use a custom toolchain, edit `src/forge_runtime/sandbox_assets/Dockerfile`, rebuild with `forge sandbox build`, and update `FORGE_SANDBOX_IMAGE` if you choose a different tag.
 
@@ -24,10 +22,12 @@ To use a custom toolchain, edit `src/forge_runtime/sandbox_assets/Dockerfile`, r
 
 ```bash
 forge sandbox run -- python --version
+forge sandbox run -- curl -I https://pypi.org
+forge sandbox run -- python -m pip install requests
 forge sandbox run -- pytest --version
 forge sandbox run -- python -m pytest
 forge sandbox run -- ruff check .
-forge sandbox run -- npm test
+forge sandbox run -- npm install
 ```
 
 Use `--read-write` only for an explicit local run where changes should be copied back:
@@ -42,13 +42,13 @@ The CLI is a diagnostic interface. In normal agent runs, OpenAI and Anthropic to
 
 Each command is run in a newly named, disposable container:
 
-- `--network none`; runtime image pulls are disabled with `--pull=never`.
+- `--network bridge` by default for internet access; `FORGE_SANDBOX_NETWORK=none` disables networking. Runtime image pulls are disabled with `--pull=never`.
 - Container root filesystem is read-only.
 - Linux capabilities are dropped; `no-new-privileges` is enabled.
 - Container runs with a non-root numeric UID/GID.
 - CPU, memory, PID count, shared memory, command duration and captured output are bounded.
 - `/tmp` is a bounded tmpfs.
-- No Docker socket, host credentials, host environment variables or arbitrary host paths are mounted.
+- No Docker socket, host credentials or host environment variables are forwarded. The container has outbound internet and can also reach destinations routable from the Docker bridge; this is not an egress firewall.
 - Only the sanitized project snapshot is mounted read/write. Existing `node_modules`, when present, is mounted separately as read-only.
 
 The host Docker daemon is still a privileged component. The container boundary does not provide a VM-grade security guarantee.
@@ -84,7 +84,7 @@ LLM agents receive `workspace_run_command` with this shape:
 
 The executable must be on the built-in allowlist. Arguments are passed directly to Docker as an argv array; no host shell parses the command. `bash` and `sh` are allowed inside the container for project scripts. The sandbox tool returns exit code, stdout, stderr, elapsed time, timeout status, changed files and applied files.
 
-The runtime caps tool-call rounds at the provider layer and the sandbox caps command duration, output, file count and snapshot size.
+The runtime caps tool-call rounds at the provider layer and the sandbox caps command duration, output, file count and snapshot size. `curl` and `wget` are included in the command allowlist.
 
 ## Configuration
 
@@ -94,6 +94,7 @@ All settings use the `FORGE_` prefix and are shown in `.env.example`.
 |---|---:|---|
 | `FORGE_SANDBOX_ENABLED` | `true` | Expose command execution to LLM providers |
 | `FORGE_SANDBOX_IMAGE` | `forge-runtime-sandbox:latest` | Already-built local image |
+| `FORGE_SANDBOX_NETWORK` | `bridge` | `bridge` enables internet; `none` is offline |
 | `FORGE_SANDBOX_DOCKER_BINARY` | `docker` | Docker CLI path/name |
 | `FORGE_SANDBOX_CPU_LIMIT` | `2` | CPUs per container |
 | `FORGE_SANDBOX_MEMORY_MB` | `2048` | Memory limit |
@@ -108,7 +109,7 @@ Set `FORGE_SANDBOX_ENABLED=false` to hide the command tool from model providers.
 
 ## Limitations
 
-- Network access is disabled during agent commands. Dependency installation from PyPI/npm or remote Git hosts will fail unless dependencies are already in the image or present in the read-only `node_modules` mount.
+- Bridge networking provides outbound internet access for dependencies and HTTP clients. It may also allow connections to private/LAN destinations reachable from the host; use `none` for untrusted workloads or add host-level egress filtering where required.
 - The default image includes a common Python/Node toolchain, not every language SDK. Add project-specific dependencies to the trusted Dockerfile and rebuild.
 - Host Python virtual environments are intentionally excluded because native extensions and absolute interpreter paths are not portable into Linux containers.
 - The project `.git` directory is excluded; commands cannot commit or inspect host Git history.
