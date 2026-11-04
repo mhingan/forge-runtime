@@ -192,7 +192,7 @@ class AgentForgeRegistry:
             description = str(item.get("description") or name)
             skill_root = PurePosixPath(path).parent
             references: dict[str, str] = {}
-            for target in re.findall(r"\\[[^\\]]+\\]\\(([^)]+)\\)", body):
+            for target in re.findall(r"\[[^\]]+\]\(([^)]+)\)", body):
                 target = target.split("#", 1)[0].split("?", 1)[0].strip()
                 if not target or "://" in target or target.startswith(("mailto:", "/")):
                     continue
