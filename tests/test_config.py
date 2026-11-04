@@ -11,6 +11,7 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
         "ANTHROPIC_API_KEY=test-anthropic-key\n"
         "FORGE_DEFAULT_PROVIDER=anthropic\n"
         "FORGE_SANDBOX_ENABLED=true\n"
+        "FORGE_SANDBOX_NETWORK=none\n"
         "FORGE_SANDBOX_IMAGE=forge-test-sandbox:latest\n"
         "FORGE_SANDBOX_MEMORY_MB=1024\n"
         "FORGE_WORKSPACE_ROOT=.\n",
@@ -24,5 +25,12 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
     assert settings.anthropic_api_key == "test-anthropic-key"
     assert settings.default_provider == "anthropic"
     assert settings.sandbox_enabled is True
+    assert settings.sandbox_network == "none"
     assert settings.sandbox_image == "forge-test-sandbox:latest"
     assert settings.sandbox_memory_mb == 1024
+
+
+
+def test_sandbox_network_defaults_to_internet_bridge() -> None:
+    settings = Settings(_env_file=None)
+    assert settings.sandbox_network == "bridge"
