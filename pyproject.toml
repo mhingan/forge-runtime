@@ -35,6 +35,7 @@ forge = "forge_runtime.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/forge_runtime"]
+force-include = { "src/forge_runtime/sandbox_assets/Dockerfile" = "forge_runtime/sandbox_assets/Dockerfile" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
