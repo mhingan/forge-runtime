@@ -31,7 +31,7 @@ Both LLM adapters can expose:
 - workspace_write_file only when the AgentForge role has default_mode read-write.
 - workspace_run_command when FORGE_SANDBOX_ENABLED=true.
 
-The command tool accepts argv arrays. It runs inside the DockerSandboxExecutor, not on the Forge Runtime host. Its container has no network and receives a sanitized project snapshot. For read-write roles, new/changed regular files are copied back; read-only roles discard all command changes. The tool returns exit status, stdout/stderr, timeout and file-change metadata.
+The command tool accepts argv arrays. It runs inside the DockerSandboxExecutor, not on the Forge Runtime host. Its container uses Docker bridge networking by default for internet access and receives a sanitized project snapshot. Set `FORGE_SANDBOX_NETWORK=none` for offline operation. For read-write roles, new/changed regular files are copied back; read-only roles discard all command changes. The tool returns exit status, stdout/stderr, timeout and file-change metadata.
 
 ## Adding a provider
 
