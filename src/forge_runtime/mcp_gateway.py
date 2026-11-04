@@ -43,7 +43,7 @@ async def forge_list_connections() -> dict[str, Any]:
 @server.tool()
 async def forge_list_tools() -> list[dict[str, Any]]:
     """List namespaced MCP tools and their input schemas from enabled connections."""
-    return (await _manager()).list_tools()
+    return (await _get_manager()).list_tools()
 
 
 @server.tool()
@@ -52,7 +52,7 @@ async def forge_call_tool(server_name: str, tool_name: str, arguments: dict[str,
 
     Use the original server tool name shown by forge_list_tools.
     """
-    manager = await _manager()
+    manager = await _get_manager()
     exposed = next(
         (name for name, item in manager._tools.items()
          if item["server"] == server_name and item["original_name"] == tool_name),
