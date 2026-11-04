@@ -251,7 +251,7 @@ Install the local gateway and a user-level Forge Runner agent profile:
     python -m pip install forge-agent-runtime
     forge setup --ide copilot
 
-The command preserves other Copilot MCP servers, registers the local stdio gateway in ~/.copilot/mcp-config.json, and installs ~/.copilot/agents/forge-runner.agent.md. Restart Copilot/VS Code and select Forge Runner. The gateway exposes tools for listing connections, discovering registry entries, inspecting tool schemas, and invoking explicitly enabled MCP tools.
+The command preserves other Copilot MCP servers, registers the local stdio gateway in ~/.copilot/mcp-config.json, and installs ~/.copilot/agents/forge-runner.agent.md. Restart Copilot/VS Code and select Forge Runner (or invoke it as `@Forge Runner` where custom-agent mentions are supported). The gateway exposes tools for listing connections, discovering registry entries, inspecting tool schemas, and invoking explicitly enabled MCP tools.
 
 The local gateway is an MCP facade, not a hosted service. Keep it bound to the local process and do not expose it over an unauthenticated network.
 
