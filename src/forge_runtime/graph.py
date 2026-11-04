@@ -26,7 +26,7 @@ def validate_plan(
     for task in plan.tasks:
         if task.agent not in known_agents:
             raise GraphError(
-                f"Task {task.id} references unknown agent: {task.agent}"
+                f"Unknown agent for task {task.id}: {task.agent}"
             )
         unknown_skills = set(task.skill_names) - known_skills
         if unknown_skills:
