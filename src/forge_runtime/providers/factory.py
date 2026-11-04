@@ -1,6 +1,4 @@
 """Provider factory with lazy, optional SDK imports."""
-import os
-
 from forge_runtime.config import Settings
 from forge_runtime.providers.mock import MockProvider
 
@@ -12,15 +10,15 @@ def create_provider(name: str, settings: Settings):
     if normalized == "openai":
         from forge_runtime.providers.openai_provider import OpenAIProvider
         return OpenAIProvider(
-            api_key=os.getenv("OPENAI_API_KEY", ""),
+            api_key=settings.openai_api_key or "",
             model=settings.openai_model,
-            base_url=settings.openai_base_url or os.getenv("OPENAI_BASE_URL"),
+            base_url=settings.openai_base_url,
             workspace_root=settings.workspace_root,
         )
     if normalized == "anthropic":
         from forge_runtime.providers.anthropic_provider import AnthropicProvider
         return AnthropicProvider(
-            api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+            api_key=settings.anthropic_api_key or "",
             model=settings.anthropic_model,
             workspace_root=settings.workspace_root,
         )
