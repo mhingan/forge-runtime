@@ -46,6 +46,7 @@ def get_sandbox() -> DockerSandboxExecutor:
         default_timeout_seconds=cfg.sandbox_default_timeout_seconds,
         max_timeout_seconds=cfg.sandbox_max_timeout_seconds,
         output_chars=cfg.sandbox_output_chars,
+        network=cfg.sandbox_network,
         max_snapshot_files=cfg.sandbox_max_snapshot_files,
         max_snapshot_bytes=cfg.sandbox_max_snapshot_mb * 1024 * 1024,
     )
