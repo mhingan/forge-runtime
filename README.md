@@ -60,7 +60,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
                  Run report + event history
 ```
 
-AgentForge profiles and skills are model context, not executable permissions. This version does not include shell, repository-write, browser, deployment or arbitrary MCP tools. A provider cannot modify the host project through this runtime.
+AgentForge profiles and skills are untrusted model context, not executable permissions. OpenAI and Anthropic providers can modify ordinary files only inside `FORGE_WORKSPACE_ROOT`, and only when the selected role is `read-write`. This version does not include shell/process execution, Git commit/push, browser, deployment or arbitrary MCP tools.
 
 ## Requirements
 
