@@ -16,6 +16,9 @@
 - [x] Docker sandbox command tool with offline containers and resource limits
 - [x] Sanitized workspace snapshots with read-only/read-write result handling
 - [x] Sandbox CLI, bundled image, configuration and security tests
+- [x] Forge MCP registry dependency and enabled-connection tool bridge for OpenAI/Anthropic agents
+- [x] Forge CLI forwarding for MCP discovery, credentials, and local gateway commands
+- [x] VS Code Copilot setup for Forge Runner and the single local MCP gateway
 - [x] Registry, graph, scheduler, API, workspace, sandbox and storage test coverage
 
 ## Production orchestration
@@ -28,6 +31,9 @@
 - [ ] Global concurrency limits and provider rate-limit backoff
 
 ## Execution plane
+- [ ] OAuth provider compatibility tests against representative remote MCP servers
+- [ ] Per-tool MCP approvals for destructive or externally visible actions
+- [ ] MCP connection health checks and long-lived connection pooling
 - [ ] VM/microVM isolation for hostile multi-tenant workloads
 - [ ] Task-level capability manifests and human approval for destructive actions
 - [ ] Git worktree isolation and patch-based code integration
