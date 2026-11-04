@@ -210,7 +210,7 @@ class AnthropicProvider:
         )
         sandbox_instructions = (
             "Use workspace_run_command to run tests, linters, install dependencies and access websites inside the "
-            "offline Docker sandbox. Pass argv arrays. Only read-write roles can copy command "
+            "Docker sandbox with internet access through Docker bridge networking. Pass argv arrays. "
             "changes back into the project."
             if self.sandbox is not None
             else "Command execution is disabled. Do not claim tests or commands were run."
