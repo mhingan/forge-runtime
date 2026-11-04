@@ -109,14 +109,14 @@ class MCPManager:
                             oauth_http_client(connection, self.vault)
                         )
                     else:
-                        import httpx2
+                        import httpx
 
                         headers = {}
                         for key, reference in (connection.header_refs or {}).items():
                             secret = self.vault.get(reference)
                             headers[key] = secret
                             self._secrets_by_server.setdefault(name, []).append(secret)
-                        http_client = httpx2.AsyncClient(headers=headers, timeout=30.0)
+                        http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
                         await self._stack.enter_async_context(http_client)
 
                     read_stream, write_stream, _ = await self._stack.enter_async_context(
