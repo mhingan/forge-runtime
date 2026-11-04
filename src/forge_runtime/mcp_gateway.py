@@ -64,6 +64,16 @@ async def forge_call_tool(server_name: str, tool_name: str, arguments: dict[str,
 
 
 @server.tool()
+async def forge_reload_connections() -> dict[str, Any]:
+    """Reconnect after the user adds, enables, disables, or removes an MCP server."""
+    global _manager_instance
+    if _manager_instance is not None:
+        await _manager_instance.close()
+        _manager_instance = None
+    return (await _get_manager()).status()
+
+
+@server.tool()
 async def forge_search_servers(query: str, limit: int = 15) -> list[dict[str, str]]:
     """Search the official public MCP Registry for servers by name."""
     records = MCPRegistry().search(query, limit=limit)
