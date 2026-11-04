@@ -36,7 +36,7 @@ RUN python -m pip install --no-cache-dir \
     "rich>=13.7,<15" \
     "fastapi>=0.115,<1" \
     "uvicorn[standard]>=0.30,<1" \
-    "agentforge-toolkit==1.1.0"
+    "agentforge-toolkit>=1.2.1,<2"
 
 ENV HOME=/tmp \
     TMPDIR=/tmp \
