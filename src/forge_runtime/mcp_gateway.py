@@ -9,9 +9,27 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from forge_mcp.registry import MCPRegistry
+from forge_runtime.config import Settings
 from forge_runtime.mcp import MCPManager
+from forge_runtime.registry import AgentForgeRegistry
 
 _manager_instance: MCPManager | None = None
+_registry_instance: AgentForgeRegistry | None = None
+
+
+def _get_registry() -> AgentForgeRegistry:
+    global _registry_instance
+    if _registry_instance is None:
+        settings = Settings()
+        registry = AgentForgeRegistry(
+            local_path=settings.agentforge_local_path,
+            repository=settings.agentforge_repository,
+            ref=settings.agentforge_ref,
+            source=settings.agentforge_source,
+        )
+        registry.load()
+        _registry_instance = registry
+    return _registry_instance
 
 
 @asynccontextmanager
@@ -43,6 +61,90 @@ async def _get_manager() -> MCPManager:
     if _manager_instance is None:
         _manager_instance = await MCPManager().start()
     return _manager_instance
+
+
+
+@server.tool()
+def forge_list_agents() -> list[dict[str, Any]]:
+    """List AgentForge specialist roles and their recommended skills."""
+    registry = _get_registry()
+    return [
+        {
+            "name": item.name,
+            "description": item.description,
+            "mode": item.mode,
+            "recommended_skills": list(item.recommended_skills),
+        }
+        for item in registry.agents.values()
+    ]
+
+
+@server.tool()
+def forge_get_agent(name: str) -> dict[str, Any]:
+    """Retrieve a specialist agent's complete instructions and boundaries."""
+    agent = _get_registry().get_agent(name)
+    return {
+        "name": agent.name,
+        "description": agent.description,
+        "mode": agent.mode,
+        "recommended_skills": list(agent.recommended_skills),
+        "content": agent.content[:12000],
+    }
+
+
+@server.tool()
+def forge_list_skills() -> list[dict[str, str]]:
+    """List AgentForge skills and their activation descriptions."""
+    registry = _get_registry()
+    return [
+        {"name": item.name, "description": item.description}
+        for item in registry.skills.values()
+    ]
+
+
+@server.tool()
+def forge_get_skill(name: str) -> dict[str, Any]:
+    """Retrieve a skill playbook and its referenced supporting material."""
+    skill = _get_registry().get_skill(name)
+    references = {
+        path: content[:8000] for path, content in list(skill.references.items())[:10]
+    }
+    return {
+        "name": skill.name,
+        "description": skill.description,
+        "content": skill.content[:12000],
+        "references": references,
+    }
+
+
+@server.tool()
+def forge_list_rules() -> list[str]:
+    """List persistent AgentForge engineering and security rules."""
+    return sorted(_get_registry().rules)
+
+
+@server.tool()
+def forge_get_rule(name: str) -> str:
+    """Retrieve one AgentForge engineering or security rule."""
+    registry = _get_registry()
+    if name not in registry.rules:
+        return f"Unknown AgentForge rule: {name}"
+    return registry.rules[name][:12000]
+
+
+@server.tool()
+def forge_list_workflows() -> list[str]:
+    """List AgentForge delivery and operational workflow playbooks."""
+    return sorted(_get_registry().workflows)
+
+
+@server.tool()
+def forge_get_workflow(name: str) -> str:
+    """Retrieve one AgentForge workflow playbook."""
+    registry = _get_registry()
+    if name not in registry.workflows:
+        return f"Unknown AgentForge workflow: {name}"
+    return registry.workflows[name][:12000]
 
 
 @server.tool()
