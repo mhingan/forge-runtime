@@ -1,5 +1,6 @@
-"""Environment-backed settings."""
+"""Environment-backed runtime configuration."""
 from pathlib import Path
+from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +15,9 @@ class Settings(BaseSettings):
     default_provider: str = "mock"
     agentforge_repository: str = "https://github.com/mhingan/agent-forge"
     agentforge_ref: str = "main"
+    agentforge_source: Literal["auto", "installed", "local", "github"] = "auto"
     agentforge_local_path: Path | None = None
     openai_model: str = "gpt-4.1"
     anthropic_model: str = "claude-sonnet-4-5"
+    api_host: str = "127.0.0.1"
+    api_port: int = Field(default=8787, ge=1, le=65535)
