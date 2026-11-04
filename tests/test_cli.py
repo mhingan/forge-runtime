@@ -76,3 +76,58 @@ def test_dotenv_update_preserves_existing_values_and_restricts_permissions(tmp_p
     assert "OPENAI_API_KEY=new-key" in content
     assert "CUSTOM_SETTING=keep-me" in content
     assert stat.S_IMODE(env_file.stat().st_mode) == 0o600
+
+
+def test_setup_copilot_merges_mcp_config_and_installs_forge_runner(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import json
+    from types import SimpleNamespace
+
+    import agentforge.core
+    import forge_runtime.cli as cli
+
+    toolkit_root = tmp_path / "agentforge"
+    (toolkit_root / "agents").mkdir(parents=True)
+    (toolkit_root / "agents" / "forge-runner.md").write_text("profile", encoding="utf-8")
+    monkeypatch.setattr(agentforge.core, "data_root", lambda: toolkit_root)
+    monkeypatch.chdir(tmp_path)
+
+    vscode_dir = tmp_path / ".vscode"
+    vscode_dir.mkdir()
+    mcp_config = vscode_dir / "mcp.json"
+    mcp_config.write_text(
+        json.dumps(
+            {
+                "servers": {
+                    "existing": {
+                        "type": "stdio",
+                        "command": "existing-server",
+                        "args": [],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    commands = []
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            commands.append(command)
+            or SimpleNamespace(returncode=0, stdout="Forge Runner installed", stderr="")
+        ),
+    )
+
+    cli._setup_copilot()
+
+    config = json.loads(mcp_config.read_text(encoding="utf-8"))
+    assert "existing" in config["servers"]
+    assert config["servers"]["forge"] == {
+        "type": "stdio",
+        "command": "forge",
+        "args": ["mcp", "serve"],
+    }
+    assert commands and commands[0][1:3] == ["-m", "agentforge"]
