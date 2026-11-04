@@ -53,7 +53,7 @@ def _update_dotenv(path: Path, values: dict[str, str]) -> None:
                 continue
         output.append(line)
     for key, value in pending.items():
-        if "\\n" in value or "\\r" in value:
+        if "\n" in value or "\r" in value:
             raise ValueError(f"Environment value for {key} cannot contain a newline.")
         output.append(f"{key}={value}")
 
