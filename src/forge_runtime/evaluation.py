@@ -1,5 +1,6 @@
 """Baseline output checks; replace or extend for domain-specific quality gates."""
 from dataclasses import dataclass
+
 from forge_runtime.models import AgentResult, TaskSpec
 
 
