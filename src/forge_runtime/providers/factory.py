@@ -1,4 +1,6 @@
 """Provider factory with lazy, optional SDK imports."""
+from forge_mcp import MCPToolBridge
+
 from forge_runtime.config import Settings
 from forge_runtime.providers.mock import MockProvider
 from forge_runtime.sandbox import DockerSandboxExecutor
@@ -8,6 +10,7 @@ def create_provider(name: str, settings: Settings):
     normalized = name.strip().lower()
     if normalized == "mock":
         return MockProvider()
+
     sandbox = (
         DockerSandboxExecutor(
             workspace_root=settings.workspace_root,
@@ -26,21 +29,27 @@ def create_provider(name: str, settings: Settings):
         if settings.sandbox_enabled
         else None
     )
+    mcp_bridge = MCPToolBridge() if settings.mcp_enabled else None
+
     if normalized == "openai":
         from forge_runtime.providers.openai_provider import OpenAIProvider
+
         return OpenAIProvider(
             api_key=settings.openai_api_key or "",
             model=settings.openai_model,
             base_url=settings.openai_base_url,
             workspace_root=settings.workspace_root,
             sandbox_executor=sandbox,
+            mcp_bridge=mcp_bridge,
         )
     if normalized == "anthropic":
         from forge_runtime.providers.anthropic_provider import AnthropicProvider
+
         return AnthropicProvider(
             api_key=settings.anthropic_api_key or "",
             model=settings.anthropic_model,
             workspace_root=settings.workspace_root,
             sandbox_executor=sandbox,
+            mcp_bridge=mcp_bridge,
         )
     raise ValueError("Unsupported provider. Choose mock, openai, or anthropic.")
