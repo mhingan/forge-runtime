@@ -469,14 +469,15 @@ class DockerSandboxExecutor:
             archive_path = snapshot.with_name("workspace-input.tar")
             try:
                 with tarfile.open(archive_path, "w") as archive:
-                    archive.add(snapshot, arcname=".", recursive=True)
+                    for item in snapshot.iterdir():
+                        archive.add(item, arcname=item.name, recursive=True)
                 extract_process = await asyncio.create_subprocess_exec(
                     self.docker_binary,
                     "exec",
                     "-i",
                     container_name,
                     "tar",
-                    "-xpf",
+                    "-xf",
                     "-",
                     "-C",
                     "/workspace",
