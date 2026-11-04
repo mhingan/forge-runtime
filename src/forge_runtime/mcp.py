@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from forge_mcp.config import ConnectionStore
+
 from forge_runtime.credentials import CredentialVault
 
 SAFE_NAME = re.compile(r"[^a-zA-Z0-9_]")
@@ -52,7 +53,7 @@ class MCPManager:
         self._secrets_by_server: dict[str, list[str]] = {}
         self.startup_errors: list[str] = []
 
-    async def start(self) -> "MCPManager":
+    async def start(self) -> MCPManager:
         if self._stack is not None:
             return self
         try:
@@ -155,7 +156,7 @@ class MCPManager:
         self._tools.clear()
         self._secrets_by_server.clear()
 
-    async def __aenter__(self) -> "MCPManager":
+    async def __aenter__(self) -> MCPManager:
         return await self.start()
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
