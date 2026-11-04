@@ -49,3 +49,12 @@ jobs:
         run: forge sandbox run -- bash -lc "PYTHONPATH=src python -m pytest -q"
       - name: Lint inside offline sandbox
         run: forge sandbox run -- ruff check src tests
+      - name: Verify read-write sandbox changes are applied
+        run: |
+          forge sandbox run --read-write -- python -c "from pathlib import Path; Path('.forge-sandbox-write-check').write_text('ok', encoding='utf-8')"
+          test "$(cat .forge-sandbox-write-check)" = "ok"
+          rm .forge-sandbox-write-check
+      - name: Verify read-only sandbox changes are discarded
+        run: |
+          forge sandbox run -- python -c "from pathlib import Path; Path('.forge-sandbox-readonly-check').write_text('must-not-escape', encoding='utf-8')"
+          test ! -e .forge-sandbox-readonly-check
