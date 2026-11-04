@@ -19,6 +19,7 @@ def create_provider(name: str, settings: Settings):
             default_timeout_seconds=settings.sandbox_default_timeout_seconds,
             max_timeout_seconds=settings.sandbox_max_timeout_seconds,
             output_chars=settings.sandbox_output_chars,
+            network=settings.sandbox_network,
             max_snapshot_files=settings.sandbox_max_snapshot_files,
             max_snapshot_bytes=settings.sandbox_max_snapshot_mb * 1024 * 1024,
         )
