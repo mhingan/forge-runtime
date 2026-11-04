@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-import re
 from typing import Any
 
 from forge_mcp.config import ConnectionStore, MCPConnection
