@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     agentforge_ref: str = "main"
     agentforge_source: Literal["auto", "installed", "local", "github"] = "auto"
     agentforge_local_path: Path | None = None
-    openai_model: str = "gpt-4.1"
+    openai_model: str = Field(default="gpt-4.1", validation_alias="OPENAI_MODEL")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_base_url: str | None = Field(default=None, validation_alias="OPENAI_BASE_URL")
-    anthropic_model: str = "claude-sonnet-4-5"
+    anthropic_model: str = Field(default="claude-sonnet-4-5", validation_alias="ANTHROPIC_MODEL")
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8787, ge=1, le=65535)
