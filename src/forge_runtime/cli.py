@@ -4,19 +4,19 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
-import httpx
 import os
 import re
 import shutil
 import tempfile
 from pathlib import Path
 
+import httpx
 import typer
+from forge_mcp.config import ConnectionStore, MCPConnection
+from forge_mcp.registry import MCPRegistry
 from rich.console import Console
 from rich.table import Table
 
-from forge_mcp.config import ConnectionStore, MCPConnection
-from forge_mcp.registry import MCPRegistry
 from forge_runtime.config import Settings
 from forge_runtime.credentials import CredentialVault
 from forge_runtime.mcp import MCPManager
