@@ -439,9 +439,16 @@ def workflow_list(
 )
 def mcp_command(ctx: typer.Context) -> None:
     """Discover, configure, authenticate, and run MCP connections."""
+    arguments = list(ctx.args)
+    if arguments[:1] == ["serve"]:
+        from forge_runtime.mcp_server import run
+
+        run()
+        return
+
     from forge_mcp.cli import main as forge_mcp_main
 
-    raise typer.Exit(forge_mcp_main(ctx.args))
+    raise typer.Exit(forge_mcp_main(arguments))
 
 
 @app.command(
