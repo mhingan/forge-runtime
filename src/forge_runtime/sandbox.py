@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import stat
+import tarfile
 import tempfile
 import time
 import uuid
@@ -453,14 +454,50 @@ class DockerSandboxExecutor:
         try:
             self._prepare_snapshot_owner(snapshot)
             # The project lives on a bounded tmpfs inside the container, not a host bind mount.
-            await self._run_control(
-                self.docker_binary,
-                "cp",
-                "-a",
-                f"{snapshot}{os.sep}.",
-                f"{container_name}:/workspace",
-                timeout_seconds=120,
-            )
+            # Stream the snapshot into the container's tmpfs. docker cp attempts to
+            # populate the read-only rootfs and is not reliable for tmpfs destinations.
+            archive_path = snapshot.with_name("workspace-input.tar")
+            try:
+                with tarfile.open(archive_path, "w") as archive:
+                    archive.add(snapshot, arcname=".", recursive=True)
+                extract_process = await asyncio.create_subprocess_exec(
+                    self.docker_binary,
+                    "exec",
+                    "-i",
+                    container_name,
+                    "tar",
+                    "-xpf",
+                    "-",
+                    "-C",
+                    "/workspace",
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                assert extract_process.stdin is not None
+                assert extract_process.stderr is not None
+                try:
+                    with archive_path.open("rb") as archive_file:
+                        while chunk := archive_file.read(1024 * 1024):
+                            extract_process.stdin.write(chunk)
+                            await extract_process.stdin.drain()
+                    extract_process.stdin.close()
+                    await extract_process.stdin.wait_closed()
+                    _, extract_stderr = await asyncio.wait_for(
+                        extract_process.communicate(),
+                        timeout=120,
+                    )
+                except (BrokenPipeError, OSError, TimeoutError) as exc:
+                    if extract_process.returncode is None:
+                        extract_process.kill()
+                    await extract_process.wait()
+                    raise SandboxError(f"Could not transfer workspace snapshot: {exc}") from exc
+                if extract_process.returncode != 0:
+                    detail = extract_stderr.decode("utf-8", errors="replace").strip()
+                    raise SandboxError(f"Could not extract workspace snapshot: {detail}")
+            finally:
+                with contextlib.suppress(OSError):
+                    archive_path.unlink()
             dependencies = self.workspace.root / "node_modules"
             if dependencies.is_dir() and not dependencies.is_symlink():
                 await self._run_control(
