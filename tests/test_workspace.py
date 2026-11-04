@@ -58,10 +58,45 @@ def test_path_traversal_is_rejected(tmp_path: Path, path: str) -> None:
         tools.read_file(path)
 
 
-def test_secret_environment_files_are_protected(tmp_path: Path) -> None:
+def test_secret_files_are_hidden_and_cannot_be_read_or_searched(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("API_KEY=super-secret-value", encoding="utf-8")
+    (tmp_path / "credentials.json").write_text(
+        '{"private_key":"super-secret-value"}', encoding="utf-8"
+    )
+    (tmp_path / ".env.example").write_text("API_KEY=replace-me", encoding="utf-8")
     tools = WorkspaceTools(tmp_path)
-    with pytest.raises(WorkspaceError, match="Secret environment"):
+
+    visible = tools.list_files()
+    assert ".env" not in visible
+    assert "credentials.json" not in visible
+    assert ".env.example" in visible
+
+    with pytest.raises(WorkspaceError, match="protected"):
+        tools.read_file(".env")
+    with pytest.raises(WorkspaceError, match="protected"):
+        tools.read_file("credentials.json")
+    assert "super-secret-value" not in tools.search_files("super-secret-value")
+
+
+def test_secret_environment_and_credential_files_are_protected_from_writes(
+    tmp_path: Path,
+) -> None:
+    tools = WorkspaceTools(tmp_path)
+    with pytest.raises(WorkspaceError, match="protected"):
         tools.write_file(".env", "API_KEY=not-for-agents", writable=True)
+    with pytest.raises(WorkspaceError, match="protected"):
+        tools.write_file("credentials.json", "{}", writable=True)
+
+
+def test_private_key_directories_are_not_accessible(tmp_path: Path) -> None:
+    ssh = tmp_path / ".ssh"
+    ssh.mkdir()
+    (ssh / "id_ed25519").write_text("private key", encoding="utf-8")
+    tools = WorkspaceTools(tmp_path)
+
+    assert ".ssh/" not in tools.list_files()
+    with pytest.raises(WorkspaceError):
+        tools.read_file(".ssh/id_ed25519")
 
 
 def test_oversized_file_is_rejected(tmp_path: Path) -> None:
