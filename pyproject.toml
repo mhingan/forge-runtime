@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forge-agent-runtime"
-version = "0.1.0"
-description = "Docker-isolated multi-agent orchestration runtime for the AgentForge ecosystem"
-keywords = ["multi-agent", "agents", "orchestration", "agentforge", "llm", "coding-agent"]
+version = "0.2.0"
+description = "MCP-enabled, Docker-isolated multi-agent orchestration runtime for the AgentForge ecosystem"
+keywords = ["multi-agent", "agents", "orchestration", "agentforge", "llm", "coding-agent", "mcp"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -25,7 +25,8 @@ authors = [{ name = "Mihaita Hingan" }]
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
-  "agentforge-toolkit==1.1.0",
+  "agentforge-toolkit>=1.2.1,<2",
+  "forge-mcp-registry>=0.2.0,<1",
   "pydantic>=2.7,<3",
   "pydantic-settings>=2.2,<3",
   "httpx>=0.27,<1",
