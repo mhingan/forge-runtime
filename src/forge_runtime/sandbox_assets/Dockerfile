@@ -11,11 +11,13 @@ RUN apt-get update \
         build-essential \
         ca-certificates \
         coreutils \
+        curl \
         git \
         make \
         nodejs \
         npm \
         tar \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Keep the in-container toolchain aligned with the supported project ranges.
