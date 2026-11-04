@@ -242,7 +242,7 @@ Manual connections are available for other community MCP servers:
     forge mcp add-stdio my-local-server npx --env-ref API_KEY=mcp/my-local-server/API_KEY -- -y @publisher/server
     forge mcp enable my-service
 
-Remote MCP connections require HTTPS. Run forge mcp connect <name> to start the OAuth 2.1 authorization-code flow with PKCE in the browser; the callback listener binds only to 127.0.0.1. Access/refresh tokens and OAuth client metadata are stored in the operating-system credential vault. For API-key servers, store the key with forge auth set and reference it from the connection manifest. New registry connections remain disabled until explicitly enabled. STDIO MCP commands run as the user's local account and are not isolated by the Docker task sandbox. Review publisher, package, permissions, and scopes before enabling them.
+Remote MCP connections require HTTPS. Run forge mcp connect <name> to start the OAuth 2.1 authorization-code flow with PKCE in the browser; the callback listener binds only to 127.0.0.1. Access/refresh tokens and OAuth client metadata are stored in the operating-system credential vault. For API-key servers, store the key with forge auth set and reference it from the connection manifest. New registry connections remain disabled until explicitly enabled. Python MCP packages are launched with `uvx` (the `uv` executable is installed as a Runtime dependency); npm MCP packages require Node.js/`npx`, and OCI packages require Docker. STDIO MCP commands run as the user's local account and are not isolated by the Docker task sandbox. Review publisher, package, permissions, and scopes before enabling them.
 
 ## GitHub Copilot integration
 
