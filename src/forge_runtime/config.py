@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     max_parallel_tasks: int = Field(default=4, ge=1, le=64)
     task_timeout_seconds: int = Field(default=900, ge=1, le=86400)
     sandbox_enabled: bool = True
+    sandbox_network: Literal["bridge", "none"] = "bridge"
     sandbox_image: str = "forge-runtime-sandbox:latest"
     sandbox_docker_binary: str = "docker"
     sandbox_cpu_limit: float = Field(default=2.0, ge=0.25, le=16)
