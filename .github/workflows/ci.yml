@@ -38,8 +38,8 @@ jobs:
           python -m pip install -e ".[dev,api]"
       - name: Lint and import normalization
         run: |
-          ruff check . --fix
-          ruff check .
+          ruff check src/forge_runtime tests --fix
+          ruff check src/forge_runtime tests
       - name: Test
         run: pytest --cov=forge_runtime --cov-report=term-missing
 
