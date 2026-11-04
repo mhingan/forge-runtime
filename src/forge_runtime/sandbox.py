@@ -316,7 +316,7 @@ class DockerSandboxExecutor:
                     "snapshot, and CPU/memory/process/time limits are enforced. Use argv as "
                     "an array (not a shell command string). Changes are copied back only for "
                     "read-write roles. Common commands: python -m pytest, pytest, ruff check ., "
-                    "npm test, node --test, git diff."
+                    "npm test, node --test, git status."
                 ),
                 "parameters": {
                     "type": "object",
