@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
+import os
+import tempfile
 from pathlib import Path
 
 import typer
@@ -32,6 +35,106 @@ app.add_typer(workflow_cli, name="workflow")
 app.add_typer(runs_cli, name="runs")
 app.add_typer(sandbox_cli, name="sandbox")
 console = Console()
+
+
+def _update_dotenv(path: Path, values: dict[str, str]) -> None:
+    """Atomically update selected keys without overwriting unrelated settings."""
+    if path.is_symlink():
+        raise ValueError(f"Refusing to write through a symlink: {path}")
+    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    pending = dict(values)
+    output: list[str] = []
+    for line in existing:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in line:
+            key = line.split("=", 1)[0].strip()
+            if key in pending:
+                output.append(f"{key}={pending.pop(key)}")
+                continue
+        output.append(line)
+    for key, value in pending.items():
+        output.append(f"{key}={value}")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=".forge-env-",
+            dir=path.parent,
+            delete=False,
+        ) as temporary:
+            temporary.write("\n".join(output) + "\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_name = temporary.name
+        os.chmod(temporary_name, 0o600)
+        os.replace(temporary_name, path)
+    finally:
+        if temporary_name and os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
+@app.command("setup")
+def setup(
+    provider: str = typer.Option(
+        "openai",
+        "--provider",
+        help="Model provider to configure: openai, anthropic or mock.",
+    ),
+) -> None:
+    """Configure a provider and build the Docker sandbox in one step."""
+    normalized = provider.strip().lower()
+    if normalized not in {"openai", "anthropic", "mock"}:
+        console.print("[red]Provider must be openai, anthropic or mock.[/red]")
+        raise typer.Exit(2)
+
+    sdk_name = {"openai": "openai", "anthropic": "anthropic"}.get(normalized)
+    if sdk_name and importlib.util.find_spec(sdk_name) is None:
+        extra = "openai" if normalized == "openai" else "anthropic"
+        console.print(
+            f'[red]Provider SDK missing.[/red] Install it with: pip install "forge-runtime[{extra}]"'
+        )
+        raise typer.Exit(2)
+
+    cfg = Settings()
+    updates = {"FORGE_DEFAULT_PROVIDER": normalized}
+    if normalized == "openai" and not cfg.openai_api_key:
+        key = typer.prompt("OpenAI API key", hide_input=True, confirmation_prompt=True).strip()
+        if not key:
+            console.print("[red]An OpenAI API key is required.[/red]")
+            raise typer.Exit(2)
+        updates["OPENAI_API_KEY"] = key
+    elif normalized == "anthropic" and not cfg.anthropic_api_key:
+        key = typer.prompt("Anthropic API key", hide_input=True, confirmation_prompt=True).strip()
+        if not key:
+            console.print("[red]An Anthropic API key is required.[/red]")
+            raise typer.Exit(2)
+        updates["ANTHROPIC_API_KEY"] = key
+
+    try:
+        _update_dotenv(Path.cwd() / ".env", updates)
+        executor = get_sandbox()
+        status = asyncio.run(executor.check())
+        if not status["image_available"]:
+            console.print(f"Building [bold]{executor.image}[/bold]...")
+            output = asyncio.run(executor.build_image())
+            if output.strip():
+                console.print(output)
+        final_status = asyncio.run(executor.check())
+        if not final_status["image_available"]:
+            raise SandboxError("Docker image build finished but the image is still unavailable.")
+    except (SandboxError, OSError, ValueError, TimeoutError) as exc:
+        console.print(f"[red]Setup failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print(
+        f"[green]Forge Runtime is ready.[/green] Provider: [bold]{normalized}[/bold]. "
+        f"Sandbox network: [bold]{executor.network}[/bold]."
+    )
+    console.print('Start with: [bold]forge run "Describe the project task"[/bold]')
 
 
 def get_sandbox() -> DockerSandboxExecutor:
