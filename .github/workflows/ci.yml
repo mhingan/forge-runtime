@@ -72,7 +72,7 @@ jobs:
       - name: Verify internet access inside sandbox
         run: forge sandbox run -- curl --fail --silent --show-error --max-time 15 -I https://pypi.org
       - name: Run complete suite inside sandbox
-        run: forge sandbox run -- bash -lc "PYTHONPATH=src python -m pytest -q"
+        run: forge sandbox run -- bash -lc "python -m pip install packages/forge-mcp packages/agent-forge .[dev,api] && python -m pytest -q"
       - name: Lint inside sandbox
         run: forge sandbox run -- ruff check src tests
       - name: Verify read-write sandbox changes are applied
