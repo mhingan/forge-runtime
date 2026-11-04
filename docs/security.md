@@ -13,7 +13,7 @@ User goals, AgentForge profiles, skills, reference files, workflow playbooks, mo
 - Workspace tools are confined to FORGE_WORKSPACE_ROOT.
 - Secret environment files, credential files, private keys and sensitive credential directories are hidden from listing/search and cannot be read or written by workspace tools.
 - The sandbox snapshot excludes .git, credentials, dependency directories, build outputs and symbolic links.
-- Sandbox commands run in Docker with no network, a read-only container root, dropped capabilities, no-new-privileges, a non-root UID, and CPU/memory/PID/time/output limits.
+- Sandbox commands run in Docker with bridged internet access by default (or no network when configured), a read-only container root, dropped capabilities, no-new-privileges, a non-root UID, and CPU/memory/PID/time/output limits.
 - No host environment variables, host credentials, Docker socket or general host filesystem paths are mounted into command containers.
 - Read-only AgentForge roles do not copy sandbox changes back to the project; read-write roles may copy back only new/modified regular files after path and symlink checks.
 - Sandbox deletions and symlink changes are not propagated.
@@ -31,7 +31,7 @@ This is a role-level capability boundary, not an approval or review system. A re
 
 The executor uses a Docker container, not a VM. It shares the host kernel and depends on the Docker daemon and runtime being secure and patched. Container escape vulnerabilities, a compromised daemon, malicious Docker configuration or a hostile host remain outside the protection this runtime can provide. Run Forge Runtime only on a trusted host with Docker access controlled by the operator.
 
-The project snapshot is sanitized, but project code and dependencies can still be malicious. Agent commands can execute that code in the container. The default image build uses network access to fetch pinned/unpinned upstream packages; the running sandbox has no network.
+The project snapshot is sanitized, but project code and dependencies can still be malicious. Agent commands can execute that code in the container. With the default Docker bridge network, commands have outbound internet access and may also reach private/LAN addresses routable from the Docker host. The runtime does not implement a domain allowlist or an egress firewall. Use `FORGE_SANDBOX_NETWORK=none` for offline execution or apply host-level egress policy when running untrusted tasks. Internet access also means project data in the snapshot could be sent to external services by code running inside the container.
 
 ## Not implemented
 
