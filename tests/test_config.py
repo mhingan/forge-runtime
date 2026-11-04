@@ -16,6 +16,7 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
         "FORGE_SANDBOX_NETWORK=none\n"
         "FORGE_SANDBOX_IMAGE=forge-test-sandbox:latest\n"
         "FORGE_SANDBOX_MEMORY_MB=1024\n"
+        "FORGE_MCP_ENABLED=true\n"
         "FORGE_WORKSPACE_ROOT=.\n",
         encoding="utf-8",
     )
@@ -32,6 +33,7 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
     assert settings.sandbox_network == "none"
     assert settings.sandbox_image == "forge-test-sandbox:latest"
     assert settings.sandbox_memory_mb == 1024
+    assert settings.mcp_enabled is True
 
 
 
