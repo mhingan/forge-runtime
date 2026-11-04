@@ -59,7 +59,7 @@ class MCPManager:
         try:
             from mcp import ClientSession, StdioServerParameters
             from mcp.client.stdio import stdio_client
-            from mcp.client.streamable_http import streamablehttp_client
+            from mcp.client.streamable_http import streamable_http_client
         except ImportError as exc:
             raise RuntimeError('MCP support is missing. Install with: pip install "forge-agent-runtime"') from exc
 
@@ -102,13 +102,25 @@ class MCPManager:
                         stdio_client(params)
                     )
                 else:
-                    headers = {}
-                    for key, reference in (connection.header_refs or {}).items():
-                        secret = self.vault.get(reference)
-                        headers[key] = secret
-                        self._secrets_by_server.setdefault(name, []).append(secret)
+                    if connection.auth_mode == "oauth":
+                        from forge_runtime.oauth import oauth_http_client
+
+                        http_client = await self._stack.enter_async_context(
+                            oauth_http_client(connection, self.vault)
+                        )
+                    else:
+                        import httpx
+
+                        headers = {}
+                        for key, reference in (connection.header_refs or {}).items():
+                            secret = self.vault.get(reference)
+                            headers[key] = secret
+                            self._secrets_by_server.setdefault(name, []).append(secret)
+                        http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
+                        await self._stack.enter_async_context(http_client)
+
                     read_stream, write_stream, _ = await self._stack.enter_async_context(
-                        streamablehttp_client(connection.url or "", headers=headers)
+                        streamable_http_client(connection.url or "", http_client=http_client)
                     )
 
                 session = await self._stack.enter_async_context(
@@ -116,6 +128,18 @@ class MCPManager:
                 )
                 await session.initialize()
                 result = await session.list_tools()
+                if connection.transport == "http" and connection.auth_mode == "oauth":
+                    from forge_runtime.oauth import KeyringOAuthStorage
+
+                    oauth_storage = KeyringOAuthStorage(self.vault, name)
+                    token_data = await oauth_storage.get_tokens()
+                    client_data = await oauth_storage.get_client_info()
+                    if token_data is not None:
+                        self._secrets_by_server.setdefault(name, []).extend(
+                            value for value in (token_data.access_token, token_data.refresh_token) if value
+                        )
+                    if client_data is not None and client_data.client_secret:
+                        self._secrets_by_server.setdefault(name, []).append(client_data.client_secret)
                 self._sessions[name] = session
                 for item in result.tools:
                     original_name = str(item.name)
