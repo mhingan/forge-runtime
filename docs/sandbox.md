@@ -14,7 +14,7 @@ Install and start Docker Desktop or Docker Engine. Then, from the Forge Runtime 
 forge setup
 ```
 
-The bundled image is `forge-runtime-sandbox:latest`. It contains Python 3.12, pytest, Ruff, mypy, coverage, uv, Node.js/npm, Git, curl, wget, bash, make and common build tools. `forge setup` builds the image once and prepares the provider configuration. Agent containers use Docker's `bridge` network by default, so commands can access the public internet.
+The bundled image is `forge-runtime-sandbox:internet-v1`. It contains Python 3.12, pytest, Ruff, mypy, coverage, uv, Node.js/npm, Git, curl, wget, bash, make and common build tools. `forge setup` builds the image once and prepares the provider configuration. Agent containers use Docker's `bridge` network by default, so commands can access the public internet.
 
 To use a custom toolchain, edit `src/forge_runtime/sandbox_assets/Dockerfile`, rebuild with `forge sandbox build`, and update `FORGE_SANDBOX_IMAGE` if you choose a different tag.
 
