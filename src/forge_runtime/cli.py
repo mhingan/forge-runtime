@@ -13,6 +13,7 @@ from pathlib import Path
 import httpx
 import typer
 from forge_mcp.config import ConnectionStore, MCPConnection
+from forge_mcp.popular import popular_servers, popularity_metadata
 from forge_mcp.registry import MCPRegistry
 from rich.console import Console
 from rich.table import Table
@@ -432,6 +433,27 @@ You are Forge Runner, the user-facing execution agent for the Forge ecosystem.
     console.print(f"Gateway config: {config_path}")
     console.print(f"Agent profile: {agent_path}")
     console.print("Restart Copilot/VS Code and select the Forge Runner agent.")
+
+
+@mcp_cli.command("popular")
+def mcp_popular(limit: int = typer.Option(100, min=1, max=100)) -> None:
+    """List the curated top-100 MCP discovery snapshot."""
+    try:
+        metadata = popularity_metadata()
+        console.print(f"[bold]{metadata['title']}[/bold] — {metadata['snapshot_date']}")
+        console.print(f"[dim]{metadata['ranking_method']}[/dim]")
+        console.print(f"[dim]{metadata['source']}[/dim]")
+        console.print(metadata["caveat"])
+        table = Table("Rank", "Server", "Publisher", "GitHub stars")
+        for item in popular_servers(limit):
+            table.add_row(
+                str(item["rank"]), item["name"], item["publisher"],
+                f"{item['github_stars']:,}",
+            )
+        console.print(table)
+    except Exception as exc:
+        console.print(f"[red]Popular catalogue unavailable:[/red] {exc}")
+        raise typer.Exit(1) from exc
 
 
 @mcp_cli.command("search")
