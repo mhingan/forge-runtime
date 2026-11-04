@@ -38,3 +38,4 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
 def test_sandbox_network_defaults_to_internet_bridge() -> None:
     settings = Settings(_env_file=None)
     assert settings.sandbox_network == "bridge"
+    assert settings.sandbox_image == "forge-runtime-sandbox:internet-v1"
