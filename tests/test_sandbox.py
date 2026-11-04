@@ -187,5 +187,5 @@ async def test_sandbox_rejects_output_exceeding_file_budget(tmp_path: Path) -> N
     with pytest.raises(SandboxError, match="file limit"):
         await executor.run(["pytest", "-q"], writable=True)
 
-    assert (root / "src" / "app.py").read_text(encoding="utf-8") == "print('original')\\n"
+    assert (root / "src" / "app.py").read_text(encoding="utf-8") == "print('original')\n"
     assert not (root / "new.py").exists()
