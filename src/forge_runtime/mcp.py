@@ -26,7 +26,7 @@ def _tool_name(server: str, tool: str) -> str:
 
 def _minimal_child_environment() -> dict[str, str]:
     allowed = {"PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL",
-               "SYSTEMROOT", "WINDIR", "APPDATA", "USERPROFILE", "NPM_CONFIG_USERCONFIG"}
+               "SYSTEMROOT", "WINDIR", "APPDATA", "USERPROFILE"}
     return {key: value for key, value in os.environ.items() if key in allowed}
 
 
@@ -49,6 +49,7 @@ class MCPManager:
         self._stack: AsyncExitStack | None = None
         self._sessions: dict[str, Any] = {}
         self._tools: dict[str, dict[str, Any]] = {}
+        self._secrets_by_server: dict[str, list[str]] = {}
         self.startup_errors: list[str] = []
 
     async def start(self) -> "MCPManager":
@@ -79,7 +80,9 @@ class MCPManager:
                 if connection.transport == "stdio":
                     env = _minimal_child_environment()
                     for variable, reference in (connection.env_refs or {}).items():
-                        env[variable] = self.vault.get(reference)
+                        secret = self.vault.get(reference)
+                        env[variable] = secret
+                        self._secrets_by_server.setdefault(name, []).append(secret)
                     params = StdioServerParameters(
                         command=connection.command or "",
                         args=list(connection.args),
@@ -90,10 +93,11 @@ class MCPManager:
                         stdio_client(params)
                     )
                 else:
-                    headers = {
-                        key: self.vault.get(reference)
-                        for key, reference in (connection.header_refs or {}).items()
-                    }
+                    headers = {}
+                    for key, reference in (connection.header_refs or {}).items():
+                        secret = self.vault.get(reference)
+                        headers[key] = secret
+                        self._secrets_by_server.setdefault(name, []).append(secret)
                     read_stream, write_stream, _ = await self._stack.enter_async_context(
                         streamablehttp_client(connection.url or "", headers=headers)
                     )
@@ -127,8 +131,12 @@ class MCPManager:
                     }
                     if len(self._tools) >= self.max_tools:
                         break
+            except KeyError as exc:
+                self.startup_errors.append(f"{name}: missing credential {str(exc).strip(chr(39))}")
             except Exception as exc:
-                self.startup_errors.append(f"{name}: {type(exc).__name__}: {str(exc)[:300]}")
+                self.startup_errors.append(
+                    f"{name}: connection failed ({type(exc).__name__}); review server setup and credentials"
+                )
         return self
 
     async def close(self) -> None:
@@ -137,6 +145,7 @@ class MCPManager:
             await stack.aclose()
         self._sessions.clear()
         self._tools.clear()
+        self._secrets_by_server.clear()
 
     async def __aenter__(self) -> "MCPManager":
         return await self.start()
@@ -158,6 +167,12 @@ class MCPManager:
              "description": meta["description"], "input_schema": meta["parameters"]}
             for exposed, meta in self._tools.items()
         ]
+
+    def _redact(self, server: str, value: str) -> str:
+        for secret in sorted(self._secrets_by_server.get(server, []), key=len, reverse=True):
+            if secret:
+                value = value.replace(secret, "[REDACTED]")
+        return value
 
     async def execute_tool(self, name: str, arguments: dict[str, Any]) -> str:
         meta = self._tools.get(name)
@@ -182,6 +197,7 @@ class MCPManager:
             )
             if getattr(result, "isError", False):
                 output = "MCP server reported an error: " + output
+            output = self._redact(meta["server"], output)
             return output[: self.result_chars]
         except Exception as exc:
             return f"MCP tool error ({type(exc).__name__}): {str(exc)[:1000]}"
