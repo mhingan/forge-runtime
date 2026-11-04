@@ -95,7 +95,7 @@ def setup(
     if sdk_name and importlib.util.find_spec(sdk_name) is None:
         extra = "openai" if normalized == "openai" else "anthropic"
         console.print(
-            f'[red]Provider SDK missing.[/red] Install it with: pip install "forge-runtime[{extra}]"'
+            f'[red]Provider SDK missing.[/red] Install it with: pip install -e ".[{extra}]"'
         )
         raise typer.Exit(2)
 
@@ -126,6 +126,30 @@ def setup(
         final_status = asyncio.run(executor.check())
         if not final_status["image_available"]:
             raise SandboxError("Docker image build finished but the image is still unavailable.")
+        if executor.network == "bridge":
+            internet = asyncio.run(
+                executor.run(
+                    [
+                        "curl",
+                        "--fail",
+                        "--silent",
+                        "--show-error",
+                        "--max-time",
+                        "15",
+                        "-I",
+                        "https://pypi.org",
+                    ],
+                    writable=False,
+                    timeout_seconds=20,
+                )
+            )
+            if internet.exit_code != 0:
+                detail = internet.stderr.strip() or internet.stdout.strip()
+                raise SandboxError(
+                    "The Docker bridge is enabled but internet access could not be verified. "
+                    "Check your firewall, VPN or proxy settings. "
+                    f"curl output: {detail[:1000]}"
+                )
     except (SandboxError, OSError, ValueError, TimeoutError) as exc:
         console.print(f"[red]Setup failed:[/red] {exc}")
         raise typer.Exit(1) from exc
