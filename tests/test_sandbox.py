@@ -157,3 +157,23 @@ def test_sandbox_tool_schema_requires_argv_and_caps_timeout(tmp_path: Path) -> N
     assert schema["name"] == "workspace_run_command"
     assert schema["parameters"]["required"] == ["argv"]
     assert schema["parameters"]["properties"]["timeout_seconds"]["maximum"] == 600
+
+def test_docker_args_use_tmpfs_and_never_bind_mount_the_project(tmp_path: Path) -> None:
+    root = make_workspace(tmp_path)
+    executor = DockerSandboxExecutor(root)
+    args = executor._docker_args(container_name="forge-test")
+
+    assert "--network" in args
+    assert args[args.index("--network") + 1] == "none"
+    assert "--read-only" in args
+    assert args[args.index("--cap-drop") + 1] == "ALL"
+    tmpfs_values = [
+        args[index + 1] for index, value in enumerate(args[:-1]) if value == "--tmpfs"
+    ]
+    assert any(value.startswith("/workspace:rw") for value in tmpfs_values)
+    mounts = [
+        args[index + 1] for index, value in enumerate(args[:-1]) if value == "--mount"
+    ]
+    assert mounts
+    assert all("dst=/opt/forge-node_modules,readonly" in value for value in mounts)
+    assert all("dst=/workspace" not in value for value in mounts)
