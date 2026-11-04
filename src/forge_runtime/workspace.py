@@ -19,8 +19,15 @@ class WorkspaceTools:
     EXCLUDED_DIRS = {
         ".git", ".venv", "venv", "node_modules", "__pycache__", ".next",
         ".dart_tool", ".idea", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-        ".forge", "dist", "build", "coverage", "htmlcov",
+        ".forge", ".aws", ".ssh", ".secrets", ".terraform",
+        "dist", "build", "coverage", "htmlcov",
     }
+    SENSITIVE_FILE_NAMES = {
+        ".env", ".npmrc", ".pypirc", ".netrc", ".git-credentials",
+        "id_rsa", "id_ed25519", "credentials", "credentials.json",
+        "service-account.json", "secrets.json", "secret.json",
+    }
+    SENSITIVE_SUFFIXES = {".pem", ".key", ".p12", ".pfx"}
     MAX_READ_BYTES = 256_000
     MAX_WRITE_BYTES = 256_000
     MAX_SEARCH_FILES = 1_000
@@ -54,6 +61,23 @@ class WorkspaceTools:
             raise WorkspaceError("Resolved path escapes the configured workspace.") from exc
         return candidate
 
+    def _is_sensitive_path(self, path: Path) -> bool:
+        try:
+            relative = path.relative_to(self.root)
+        except ValueError:
+            return True
+        parts = tuple(part.lower() for part in relative.parts)
+        if any(part in self.EXCLUDED_DIRS for part in parts):
+            return True
+        if not parts:
+            return False
+        name = parts[-1]
+        if name in self.SENSITIVE_FILE_NAMES:
+            return True
+        if name.startswith(".env.") and name != ".env.example":
+            return True
+        return Path(name).suffix.lower() in self.SENSITIVE_SUFFIXES
+
     @staticmethod
     def _display(path: Path, root: Path) -> str:
         return path.relative_to(root).as_posix() or "."
@@ -64,7 +88,7 @@ class WorkspaceTools:
             raise WorkspaceError(f"Directory does not exist: {directory}")
         entries: list[str] = []
         for path in sorted(target.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
-            if path.name in self.EXCLUDED_DIRS or path.is_symlink():
+            if path.name in self.EXCLUDED_DIRS or path.is_symlink() or self._is_sensitive_path(path):
                 continue
             suffix = "/" if path.is_dir() else ""
             entries.append(self._display(path, self.root) + suffix)
@@ -75,6 +99,8 @@ class WorkspaceTools:
 
     def read_file(self, path: str) -> str:
         target = self._resolve(path)
+        if self._is_sensitive_path(target):
+            raise WorkspaceError("Secret or credential files are protected from agent reads.")
         if target.is_symlink() or not target.is_file():
             raise WorkspaceError(f"File does not exist or is not a regular file: {path}")
         size = target.stat().st_size
@@ -103,7 +129,7 @@ class WorkspaceTools:
             ]
             for filename in files:
                 file_path = Path(base) / filename
-                if file_path.is_symlink():
+                if file_path.is_symlink() or self._is_sensitive_path(file_path):
                     continue
                 scanned += 1
                 if scanned > self.MAX_SEARCH_FILES:
@@ -133,11 +159,8 @@ class WorkspaceTools:
         target = self._resolve(path)
         if target.is_symlink():
             raise WorkspaceError("Writing through symbolic links is not permitted.")
-        name = target.name.lower()
-        if name == ".env" or (name.startswith(".env.") and name != ".env.example"):
-            raise WorkspaceError("Secret environment files are protected from agent writes.")
-        if target.suffix.lower() in {".pem", ".key", ".p12", ".pfx"}:
-            raise WorkspaceError("Private-key and certificate files are protected.")
+        if self._is_sensitive_path(target):
+            raise WorkspaceError("Secret or credential files are protected from agent writes.")
         if not isinstance(content, str):
             raise WorkspaceError("File content must be text.")
         encoded = content.encode("utf-8")
@@ -155,6 +178,8 @@ class WorkspaceTools:
         except ValueError as exc:
             raise WorkspaceError("Target parent escapes the configured workspace.") from exc
         resolved_target = resolved_parent / target.name
+        if self._is_sensitive_path(resolved_target):
+            raise WorkspaceError("Secret or credential files are protected from agent writes.")
         if resolved_target.exists() and resolved_target.is_symlink():
             raise WorkspaceError("Writing through symbolic links is not permitted.")
 
