@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import secrets
+from ipaddress import ip_address
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from forge_runtime import __version__
@@ -28,20 +29,26 @@ class CreateRunRequest(BaseModel):
 
 
 def authorize(
+    request: Request,
     x_forge_api_key: Annotated[str | None, Header()] = None,
 ) -> None:
-    """Allow local unauthenticated access, require a configured key for network hosts."""
-    local_hosts = {"127.0.0.1", "localhost", "::1"}
+    """Require a token for non-loopback clients, regardless of the server bind address."""
     if settings.api_token:
         if not x_forge_api_key or not secrets.compare_digest(
             x_forge_api_key, settings.api_token
         ):
             raise HTTPException(status_code=401, detail="Invalid or missing Forge API key.")
         return
-    if settings.api_host not in local_hosts:
+
+    client_host = request.client.host if request.client is not None else ""
+    try:
+        is_loopback = ip_address(client_host).is_loopback
+    except ValueError:
+        is_loopback = False
+    if not is_loopback:
         raise HTTPException(
-            status_code=503,
-            detail="Set FORGE_API_TOKEN before binding the API to a non-local interface.",
+            status_code=401,
+            detail="Set FORGE_API_TOKEN and send X-Forge-API-Key for non-local access.",
         )
 
 
