@@ -53,6 +53,8 @@ def _update_dotenv(path: Path, values: dict[str, str]) -> None:
                 continue
         output.append(line)
     for key, value in pending.items():
+        if "\\n" in value or "\\r" in value:
+            raise ValueError(f"Environment value for {key} cannot contain a newline.")
         output.append(f"{key}={value}")
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,6 +103,8 @@ def setup(
 
     cfg = Settings()
     updates = {"FORGE_DEFAULT_PROVIDER": normalized}
+    if cfg.sandbox_image == "forge-runtime-sandbox:latest":
+        updates["FORGE_SANDBOX_IMAGE"] = "forge-runtime-sandbox:internet-v1"
     if normalized == "openai" and not cfg.openai_api_key:
         key = typer.prompt("OpenAI API key", hide_input=True, confirmation_prompt=True).strip()
         if not key:
