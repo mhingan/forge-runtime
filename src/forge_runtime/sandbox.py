@@ -340,6 +340,19 @@ class DockerSandboxExecutor:
             }
         ]
 
+    def _prepare_snapshot_owner(self, snapshot: Path) -> None:
+        uid = os.getuid() if hasattr(os, "getuid") else 10001
+        if uid != 0 or not hasattr(os, "chown"):
+            return
+        for base, dirs, files in os.walk(snapshot):
+            os.chown(base, 10001, 10001)
+            for name in dirs:
+                with contextlib.suppress(OSError):
+                    os.chown(Path(base) / name, 10001, 10001, follow_symlinks=False)
+            for name in files:
+                with contextlib.suppress(OSError):
+                    os.chown(Path(base) / name, 10001, 10001, follow_symlinks=False)
+
     def _docker_args(self, *, container_name: str) -> list[str]:
         uid = os.getuid() if hasattr(os, "getuid") else 10001
         gid = os.getgid() if hasattr(os, "getgid") else 10001
@@ -434,10 +447,11 @@ class DockerSandboxExecutor:
             *self._docker_args(container_name=container_name),
             self.image,
             "sleep",
-            "infinity",
+            str(self.max_timeout_seconds + 60),
         ]
         await self._run_control(*create_command, timeout_seconds=30)
         try:
+            self._prepare_snapshot_owner(snapshot)
             # The project lives on a bounded tmpfs inside the container, not a host bind mount.
             await self._run_control(
                 self.docker_binary,
@@ -466,6 +480,10 @@ class DockerSandboxExecutor:
                 "--workdir",
                 "/workspace",
                 container_name,
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=5s",
+                f"{timeout_seconds}s",
                 *argv,
             ]
             try:
@@ -481,28 +499,30 @@ class DockerSandboxExecutor:
             assert process.stderr is not None
             stdout_task = asyncio.create_task(self._read_limited(process.stdout))
             stderr_task = asyncio.create_task(self._read_limited(process.stderr))
-            timed_out = False
+            host_timed_out = False
             try:
-                await asyncio.wait_for(process.wait(), timeout=timeout_seconds)
+                await asyncio.wait_for(process.wait(), timeout=timeout_seconds + 15)
             except TimeoutError:
-                timed_out = True
+                host_timed_out = True
                 await self._stop_container(container_name)
                 if process.returncode is None:
                     process.kill()
                 await process.wait()
             stdout_data, stdout_truncated = await stdout_task
             stderr_data, stderr_truncated = await stderr_task
+            timed_out = host_timed_out or process.returncode == 124
             if timed_out:
-                stderr_data += b"\\nForge Runtime: command timed out and the sandbox was stopped."
+                stderr_data += b"\\nForge Runtime: command timed out and was stopped."
 
-            # Extract the bounded tmpfs workspace before the disposable container is removed.
-            await self._run_control(
-                self.docker_binary,
-                "cp",
-                f"{container_name}:/workspace/.",
-                str(snapshot),
-                timeout_seconds=120,
-            )
+            if not host_timed_out:
+                # Extract the bounded tmpfs workspace before the disposable container is removed.
+                await self._run_control(
+                    self.docker_binary,
+                    "cp",
+                    f"{container_name}:/workspace/.",
+                    str(snapshot),
+                    timeout_seconds=120,
+                )
             return (
                 process.returncode if process.returncode is not None else 124,
                 stdout_data.decode("utf-8", errors="replace"),
