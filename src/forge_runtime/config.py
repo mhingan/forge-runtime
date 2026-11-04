@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     database_url: str = "sqlite:///./.forge/forge.db"
+    workspace_root: Path = Path(".")
     max_parallel_tasks: int = Field(default=4, ge=1, le=64)
     task_timeout_seconds: int = Field(default=900, ge=1, le=86400)
     default_provider: str = "mock"
