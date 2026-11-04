@@ -76,7 +76,7 @@ git clone https://github.com/mhingan/forge-runtime.git
 cd forge-runtime
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev,openai,api]"
+python -m pip install -e ".[openai]"
 ```
 
 The dependency installation also installs `agentforge-toolkit==1.1.0`. No separate AgentForge clone is required for the standard configuration.
