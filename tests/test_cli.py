@@ -2,7 +2,6 @@ from typer.testing import CliRunner
 
 from forge_runtime.cli import app
 
-
 runner = CliRunner()
 
 
