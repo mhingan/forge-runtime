@@ -448,6 +448,21 @@ def mcp_search(query: str, limit: int = typer.Option(20, min=1, max=100)) -> Non
     console.print(table)
 
 
+@mcp_cli.command("browse")
+def mcp_browse(limit: int = typer.Option(100, min=1, max=100)) -> None:
+    """Browse up to 100 alphabetical entries in the official MCP Registry."""
+    try:
+        records = MCPRegistry().browse(limit=limit)
+    except Exception as exc:
+        console.print(f"[red]MCP registry browse failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    table = Table("Server", "Version", "Transport", "Description")
+    for item in records:
+        transport = "HTTP" if item.remotes else "STDIO/package" if item.packages else "metadata"
+        table.add_row(item.name, item.version or "-", transport, item.description[:100])
+    console.print(table)
+
+
 @mcp_cli.command("install")
 def mcp_install(
     registry_name: str,
