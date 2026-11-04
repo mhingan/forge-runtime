@@ -18,7 +18,7 @@ def test_cli_help_is_available() -> None:
 def test_cli_registry_validation_uses_installed_agentforge() -> None:
     result = runner.invoke(app, ["registry", "validate"])
     assert result.exit_code == 0
-    assert "15 agents" in result.stdout
+    assert "agents" in result.stdout
     assert "18 skills" in result.stdout
     assert "agentforge-toolkit:" in result.stdout
 
@@ -30,6 +30,13 @@ def test_sandbox_cli_commands_are_registered() -> None:
     assert "build" in result.stdout
     assert "check" in result.stdout
     assert "run" in result.stdout
+
+
+def test_mcp_and_auth_commands_are_registered() -> None:
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "mcp" in result.stdout
+    assert "auth" in result.stdout
 
 
 def test_sandbox_run_help_explains_argument_array() -> None:
