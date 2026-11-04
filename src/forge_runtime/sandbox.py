@@ -510,19 +510,23 @@ class DockerSandboxExecutor:
                 await process.wait()
             stdout_data, stdout_truncated = await stdout_task
             stderr_data, stderr_truncated = await stderr_task
-            timed_out = host_timed_out or process.returncode == 124
+            timed_out = host_timed_out or process.returncode in {124, 137}
             if timed_out:
                 stderr_data += b"\\nForge Runtime: command timed out and was stopped."
 
             if not host_timed_out:
-                # Extract the bounded tmpfs workspace before the disposable container is removed.
+                # Copy into a fresh directory so deleted container files are detectable.
+                output_snapshot = snapshot.with_name("sandbox-output")
+                output_snapshot.mkdir()
                 await self._run_control(
                     self.docker_binary,
                     "cp",
                     f"{container_name}:/workspace/.",
-                    str(snapshot),
+                    str(output_snapshot),
                     timeout_seconds=120,
                 )
+                shutil.rmtree(snapshot)
+                output_snapshot.rename(snapshot)
             return (
                 process.returncode if process.returncode is not None else 124,
                 stdout_data.decode("utf-8", errors="replace"),
