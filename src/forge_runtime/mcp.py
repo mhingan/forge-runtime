@@ -208,7 +208,8 @@ class MCPManager:
             output = self._redact(meta["server"], output)
             return output[: self.result_chars]
         except Exception as exc:
-            return f"MCP tool error ({type(exc).__name__}): {str(exc)[:1000]}"
+            detail = self._redact(meta["server"], str(exc))
+            return f"MCP tool error ({type(exc).__name__}): {detail[:1000]}"
 
     def status(self) -> dict[str, Any]:
         return {
