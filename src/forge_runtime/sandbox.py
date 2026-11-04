@@ -340,20 +340,15 @@ class DockerSandboxExecutor:
             }
         ]
 
-    def _docker_args(self, snapshot: Path, *, container_name: str) -> list[str]:
+    def _docker_args(self, *, container_name: str) -> list[str]:
         uid = os.getuid() if hasattr(os, "getuid") else 10001
         gid = os.getgid() if hasattr(os, "getgid") else 10001
         if uid == 0:
             uid, gid = 10001, 10001
-            if hasattr(os, "chown"):
-                for base, _dirs, files in os.walk(snapshot):
-                    os.chown(base, uid, gid)
-                    for name in files:
-                        with contextlib.suppress(OSError):
-                            os.chown(Path(base) / name, uid, gid, follow_symlinks=False)
 
+        workspace_tmpfs_mb = self.max_snapshot_bytes // (1024 * 1024) + 256
         args = [
-            "run", "--rm", "--pull=never", "--name", container_name,
+            "--name", container_name,
             "--network", "none",
             "--read-only",
             "--cap-drop", "ALL",
@@ -362,23 +357,54 @@ class DockerSandboxExecutor:
             "--memory", f"{self.memory_mb}m",
             "--cpus", str(self.cpu_limit),
             "--shm-size", "64m",
-            "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m",
+            "--tmpfs", f"/workspace:rw,nosuid,nodev,size={workspace_tmpfs_mb}m,mode=1777",
+            "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m,mode=1777",
             "--user", f"{uid}:{gid}",
             "--workdir", "/workspace",
             "--env", "HOME=/tmp",
             "--env", "TMPDIR=/tmp",
             "--env", "PYTHONDONTWRITEBYTECODE=1",
             "--env", "PYTEST_ADDOPTS=-p no:cacheprovider",
-            "--mount", f"type=bind,src={snapshot},dst=/workspace",
+            "--env", "PATH=/opt/forge-node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
         ]
         dependencies = self.workspace.root / "node_modules"
         if dependencies.is_dir() and not dependencies.is_symlink():
             args.extend([
                 "--mount",
-                f"type=bind,src={dependencies.resolve()},dst=/workspace/node_modules,readonly",
+                f"type=bind,src={dependencies.resolve()},dst=/opt/forge-node_modules,readonly",
             ])
-        args.append(self.image)
         return args
+
+    async def _run_control(
+        self,
+        *command: str,
+        timeout_seconds: int = 30,
+    ) -> tuple[bytes, bytes]:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except (FileNotFoundError, OSError) as exc:
+            raise SandboxError(f"Could not start Docker command: {exc}") from exc
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=timeout_seconds,
+            )
+        except TimeoutError as exc:
+            process.kill()
+            await process.communicate()
+            raise SandboxError(
+                f"Docker operation exceeded its {timeout_seconds}-second timeout."
+            ) from exc
+        if process.returncode != 0:
+            detail = stderr.decode("utf-8", errors="replace").strip()
+            raise SandboxError(
+                detail or f"Docker command exited with code {process.returncode}."
+            )
+        return stdout, stderr
 
     async def _read_limited(self, stream: asyncio.StreamReader) -> tuple[bytes, bool]:
         maximum = self.output_chars * 4
@@ -399,45 +425,93 @@ class DockerSandboxExecutor:
         timeout_seconds: int,
     ) -> tuple[int, str, str, bool, bool]:
         container_name = f"forge-task-{uuid.uuid4().hex[:16]}"
-        args = [self.docker_binary, *self._docker_args(snapshot, container_name=container_name), *argv]
+        create_command = [
+            self.docker_binary,
+            "run",
+            "-d",
+            "--rm",
+            "--pull=never",
+            *self._docker_args(container_name=container_name),
+            self.image,
+            "sleep",
+            "infinity",
+        ]
+        await self._run_control(*create_command, timeout_seconds=30)
         try:
-            process = await asyncio.create_subprocess_exec(
-                *args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            # The project lives on a bounded tmpfs inside the container, not a host bind mount.
+            await self._run_control(
+                self.docker_binary,
+                "cp",
+                "-a",
+                f"{snapshot}{os.sep}.",
+                f"{container_name}:/workspace",
+                timeout_seconds=120,
             )
-        except FileNotFoundError as exc:
-            raise SandboxError(
-                "Docker CLI was not found. Install Docker Desktop/Engine and ensure "
-                f"'{self.docker_binary}' is on PATH."
-            ) from exc
-        except OSError as exc:
-            raise SandboxError(f"Could not start Docker: {exc}") from exc
+            dependencies = self.workspace.root / "node_modules"
+            if dependencies.is_dir() and not dependencies.is_symlink():
+                await self._run_control(
+                    self.docker_binary,
+                    "exec",
+                    container_name,
+                    "ln",
+                    "-s",
+                    "/opt/forge-node_modules",
+                    "/workspace/node_modules",
+                    timeout_seconds=15,
+                )
 
-        assert process.stdout is not None
-        assert process.stderr is not None
-        stdout_task = asyncio.create_task(self._read_limited(process.stdout))
-        stderr_task = asyncio.create_task(self._read_limited(process.stderr))
-        timed_out = False
-        try:
-            await asyncio.wait_for(process.wait(), timeout=timeout_seconds)
-        except TimeoutError:
-            timed_out = True
+            command = [
+                self.docker_binary,
+                "exec",
+                "--workdir",
+                "/workspace",
+                container_name,
+                *argv,
+            ]
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            except (FileNotFoundError, OSError) as exc:
+                raise SandboxError(f"Could not start sandbox command: {exc}") from exc
+
+            assert process.stdout is not None
+            assert process.stderr is not None
+            stdout_task = asyncio.create_task(self._read_limited(process.stdout))
+            stderr_task = asyncio.create_task(self._read_limited(process.stderr))
+            timed_out = False
+            try:
+                await asyncio.wait_for(process.wait(), timeout=timeout_seconds)
+            except TimeoutError:
+                timed_out = True
+                await self._stop_container(container_name)
+                if process.returncode is None:
+                    process.kill()
+                await process.wait()
+            stdout_data, stdout_truncated = await stdout_task
+            stderr_data, stderr_truncated = await stderr_task
+            if timed_out:
+                stderr_data += b"\\nForge Runtime: command timed out and the sandbox was stopped."
+
+            # Extract the bounded tmpfs workspace before the disposable container is removed.
+            await self._run_control(
+                self.docker_binary,
+                "cp",
+                f"{container_name}:/workspace/.",
+                str(snapshot),
+                timeout_seconds=120,
+            )
+            return (
+                process.returncode if process.returncode is not None else 124,
+                stdout_data.decode("utf-8", errors="replace"),
+                stderr_data.decode("utf-8", errors="replace"),
+                timed_out,
+                stdout_truncated or stderr_truncated,
+            )
+        finally:
             await self._stop_container(container_name)
-            if process.returncode is None:
-                process.kill()
-            await process.wait()
-        stdout_data, stdout_truncated = await stdout_task
-        stderr_data, stderr_truncated = await stderr_task
-        if timed_out:
-            stderr_data += b"\nForge Runtime: command timed out and the sandbox was stopped."
-        return (
-            process.returncode if process.returncode is not None else 124,
-            stdout_data.decode("utf-8", errors="replace"),
-            stderr_data.decode("utf-8", errors="replace"),
-            timed_out,
-            stdout_truncated or stderr_truncated,
-        )
 
     async def _stop_container(self, name: str) -> None:
         for action in ("kill", "rm"):
