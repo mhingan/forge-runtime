@@ -42,12 +42,12 @@ When FORGE_SANDBOX_ENABLED is true, LLM providers also receive workspace_run_com
 
 1. Validates the argv array against a developer-command allowlist and a timeout budget.
 2. Copies a sanitized snapshot into a temporary host directory, excluding .git, credentials, dependency/build folders and symlinks.
-3. Starts a disposable local image with no network, read-only root filesystem, dropped capabilities, no-new-privileges, numeric non-root UID/GID, CPU/memory/PID/tmpfs limits and command timeout.
+3. Starts a disposable local image using Docker bridge networking by default (or no network when configured), with a read-only root filesystem, dropped capabilities, no-new-privileges, numeric non-root UID/GID, CPU/memory/PID/tmpfs limits and command timeout.
 4. Mounts only the sanitized snapshot and (when present) node_modules as read-only.
 5. Captures bounded stdout/stderr, exit code and elapsed duration.
 6. Hashes the snapshot before/after. New/changed regular files are copied back atomically only for read-write roles; deletions and symlinks are discarded.
 
-The image is built explicitly with forge sandbox build. Runtime execution uses --pull=never and does not fetch images. The default image includes Python and Node test/build tools. Project-specific dependencies can be included in a custom trusted Dockerfile. Runtime containers use bridge networking by default, so package installation from remote registries is available. Offline mode is selectable with `FORGE_SANDBOX_NETWORK=none`.
+The image is built explicitly with forge sandbox build. Runtime execution uses --pull=never and does not fetch images. The default image includes Python, Node, curl and wget. Project-specific dependencies can be installed during a combined command (for example `npm install && npm test` or `python -m pip install -r requirements.txt && pytest`) using temporary writable package directories. Runtime containers use bridge networking by default; offline mode is selectable with `FORGE_SANDBOX_NETWORK=none`.
 
 Docker is a container boundary, not a VM. The Docker daemon and host kernel remain trusted components.
 
