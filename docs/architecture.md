@@ -2,7 +2,7 @@
 
 ## System boundary
 
-AgentForge is the knowledge plane. The published agentforge-toolkit package embeds canonical specialist profiles, skills, rules, workflow playbooks and catalogs. Forge Runtime is the execution plane: planning, scheduling, delegation, model calls, workspace operations, evaluation and persisted run state.
+AgentForge is the knowledge plane. The published agentforge-toolkit package embeds canonical specialist profiles, skills, rules, workflow playbooks and catalogs. Forge Runtime is the execution plane: planning, scheduling, delegation, model calls, workspace file operations, sandboxed command execution, evaluation and persisted run state.
 
 The dependency is intentionally one-way. AgentForge does not import Forge Runtime, and Forge Runtime does not install or invoke provider-specific coding-agent CLIs that AgentForge targets.
 
@@ -30,20 +30,26 @@ The provider protocol exposes:
 - plan(goal, available_agents) -> ExecutionPlan
 - execute(AgentRequest) -> AgentResult
 
-Mock produces deterministic demo outputs and never changes project files. OpenAI and Anthropic adapters support model tool-calling for workspace operations. The runtime owns scheduler state, retries, deadlines and persistence.
+Mock produces deterministic demo outputs and never changes project files. OpenAI and Anthropic adapters support workspace file tools and Docker sandbox tool-calling. The runtime owns scheduler state, retries, deadlines and persistence.
 
-## Workspace tool capabilities
+## Workspace file tools
 
-LLM providers receive a fixed set of tools:
+LLM providers receive list/read/search operations. The write tool is exposed only to AgentForge roles with default_mode read-write. Paths are confined to FORGE_WORKSPACE_ROOT; secrets, credential files and private keys are hidden/protected. Writes use atomic replacement and reject symlinks and path traversal.
 
-- workspace_list_files
-- workspace_read_file
-- workspace_search_files
-- workspace_write_file (only when the AgentForge role has default_mode read-write)
+## Docker sandbox executor
 
-The workspace root is set through FORGE_WORKSPACE_ROOT and resolved to an absolute directory. Paths are checked after resolution and may not escape the root. Traversal, drive-qualified paths, excluded build/dependency directories, secret environment files and private-key files are blocked. Read/write sizes, search results, tool rounds and total tool calls are capped.
+When FORGE_SANDBOX_ENABLED is true, LLM providers also receive workspace_run_command. The executor:
 
-There is no shell command, process execution, network, deletion, Git push, deployment or arbitrary MCP tool. Model providers cannot execute tests in this version; they must report validation that remains to be run.
+1. Validates the argv array against a developer-command allowlist and a timeout budget.
+2. Copies a sanitized snapshot into a temporary host directory, excluding .git, credentials, dependency/build folders and symlinks.
+3. Starts a disposable local image with no network, read-only root filesystem, dropped capabilities, no-new-privileges, numeric non-root UID/GID, CPU/memory/PID/tmpfs limits and command timeout.
+4. Mounts only the sanitized snapshot and (when present) node_modules as read-only.
+5. Captures bounded stdout/stderr, exit code and elapsed duration.
+6. Hashes the snapshot before/after. New/changed regular files are copied back atomically only for read-write roles; deletions and symlinks are discarded.
+
+The image is built explicitly with forge sandbox build. Runtime execution uses --pull=never and does not fetch images. The default image includes Python and Node test/build tools. Project-specific dependencies can be included in a custom trusted Dockerfile. Runtime containers have no network, so package installation from remote registries is unavailable.
+
+Docker is a container boundary, not a VM. The Docker daemon and host kernel remain trusted components.
 
 ## DAG scheduler
 
@@ -57,8 +63,8 @@ SQLite stores run snapshots, task statuses, output and audit events. It is appro
 
 ## HTTP API
 
-The optional FastAPI service exposes health, registry inspection, synchronous run submission and run history endpoints. It binds to localhost by default. Network binds require FORGE_API_TOKEN and X-Forge-API-Key. A run request waits for execution to finish.
+The optional FastAPI service exposes health, registry inspection, synchronous run submission and run history endpoints. It binds to localhost by default. Network clients require FORGE_API_TOKEN and X-Forge-API-Key. A run request waits for execution to finish.
 
 ## Future production architecture
 
-A production deployment should add PostgreSQL, durable workers, worker leases, cancellation and idempotency, an artifact store, sandboxed command execution, a resumable approval service, tenant authorization, cost budgets and event streaming.
+A production deployment should add PostgreSQL, durable workers, worker leases, cancellation and idempotency, artifact storage, VM/microVM isolation for hostile code, resumable approval, tenant authorization, cost budgets and event streaming.
