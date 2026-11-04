@@ -20,7 +20,7 @@ def validate_plan(
 
     ids = [task.id for task in plan.tasks]
     if len(ids) != len(set(ids)):
-        raise GraphError("Plan contains duplicate task IDs.")
+        raise GraphError("Duplicate task IDs in execution plan.")
     known_ids = set(ids)
 
     for task in plan.tasks:
