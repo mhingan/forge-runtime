@@ -189,12 +189,28 @@ class AgentForgeRegistry:
                 raise RegistryError(f"Duplicate AgentForge skill name: {name}")
             path = self._safe_relative_path(str(item.get("path") or f"skills/{name}/SKILL.md"))
             body = read(path)
-            description = str(item.get("description", ""))
-            if not description:
-                match = re.search(r"(?m)^description:\\s*['\"]?(.+?)['\"]?\\s*$", body)
-                description = match.group(1) if match else name
+            description = str(item.get("description") or name)
+            skill_root = PurePosixPath(path).parent
+            references: dict[str, str] = {}
+            for target in re.findall(r"\\[[^\\]]+\\]\\(([^)]+)\\)", body):
+                target = target.split("#", 1)[0].split("?", 1)[0].strip()
+                if not target or "://" in target or target.startswith(("mailto:", "/")):
+                    continue
+                try:
+                    reference_path = self._safe_relative_path(
+                        (skill_root / target).as_posix()
+                    )
+                    if PurePosixPath(reference_path).parts[:len(skill_root.parts)] != skill_root.parts:
+                        continue
+                    references[target] = read(reference_path)
+                except RegistryError:
+                    continue
             loaded_skills[name] = SkillDefinition(
-                name=name, description=description, path=path, content=body
+                name=name,
+                description=description,
+                path=path,
+                content=body,
+                references=references,
             )
         self._agents = loaded_agents
         self._skills = loaded_skills
