@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     agentforge_source: Literal["auto", "installed", "local", "github"] = "auto"
     agentforge_local_path: Path | None = None
     openai_model: str = "gpt-4.1"
+    openai_base_url: str | None = None
     anthropic_model: str = "claude-sonnet-4-5"
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8787, ge=1, le=65535)
+    api_token: str | None = None
