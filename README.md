@@ -82,6 +82,18 @@ python -m pip install -e ".[openai]"
 The dependency installation also installs `agentforge-toolkit==1.1.0`. No separate AgentForge clone is required for the standard configuration.
 
 
+## Install from PyPI
+
+Once the first release is published:
+
+```bash
+python -m pip install "forge-agent-runtime[openai]"
+forge setup
+forge run "Inspect this project, implement the requested feature and run the tests"
+```
+
+For Anthropic, install `forge-agent-runtime[anthropic]`. The PyPI distribution is named `forge-agent-runtime`; the Python import package remains `forge_runtime`, and the command-line executable remains `forge`.
+
 ## Quick start — two commands after installation
 
 From the project directory, run:
@@ -245,7 +257,7 @@ The API executes a submitted run synchronously and returns the final run record.
 
 ## Configuration
 
-See `.env.example`.
+See `.env.example` and [the PyPI publishing guide](docs/publishing.md).
 
 | Variable | Purpose | Default |
 |---|---|---|
