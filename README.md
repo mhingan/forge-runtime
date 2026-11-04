@@ -23,6 +23,7 @@ The runtime does not call an undocumented AgentForge registry class or assume th
 - **Task graph:** validates unique IDs, known roles/skills, dependencies, cycles and task limits before dispatch.
 - **Parallel scheduler:** independent tasks run concurrently under a configurable semaphore.
 - **Dependency context:** successful outputs are passed to tasks that depend on them.
+- **Workspace tools:** OpenAI and Anthropic agents can list, read, search and (for `read-write` roles) write files in a configured project workspace.
 - **Retries and deadlines:** bounded attempts and per-task timeouts.
 - **Failure propagation:** tasks that depend on failed work are marked blocked.
 - **Evaluation:** baseline output validation behind a replaceable evaluator contract.
@@ -121,6 +122,29 @@ python -m pip install -e ".[anthropic]"
 
 The LLM providers plan and generate task outputs, but they do not have host tools. They must not claim to have modified files, run tests or deployed software.
 
+## Workspace access for coding tasks
+
+OpenAI and Anthropic providers expose bounded workspace tools during specialist execution:
+
+| Tool | Capability | AgentForge permission |
+|---|---|---|
+| `workspace_list_files` | List project files | read-only and read-write |
+| `workspace_read_file` | Read UTF-8 source files | read-only and read-write |
+| `workspace_search_files` | Search source text | read-only and read-write |
+| `workspace_write_file` | Create or replace UTF-8 files | read-write only |
+
+The default workspace is the directory from which `forge` is launched. Set `FORGE_WORKSPACE_ROOT` to select a specific project. The runtime confines paths to that root and rejects traversal paths, drive-qualified paths, symlinks that escape the root, secret environment files and private-key files. It excludes common dependency/build directories and caps file sizes, search results, tool rounds and total tool calls.
+
+Example:
+
+```bash
+export FORGE_WORKSPACE_ROOT="/path/to/my-project"
+export OPENAI_API_KEY="..."
+forge run "Inspect the project, implement a responsive settings page, and add tests" --provider openai
+```
+
+The model can read and write files through workspace tools, but cannot run shell commands or execute tests in this version. The final response must identify tests that remain unrun. Mock mode never modifies files. Review the resulting diff before using changes in production.
+
 ## Registry source selection
 
 The default setting `FORGE_AGENTFORGE_SOURCE=auto` loads the packaged AgentForge data via `agentforge.core.data_root()`.
@@ -182,6 +206,7 @@ See `.env.example`.
 | `FORGE_MAX_PARALLEL_TASKS` | Max concurrent tasks | `4` |
 | `FORGE_TASK_TIMEOUT_SECONDS` | Per-task timeout ceiling | `900` |
 | `FORGE_DATABASE_URL` | SQLite database URL | `sqlite:///./.forge/forge.db` |
+| `FORGE_WORKSPACE_ROOT` | Root directory visible to LLM workspace tools | `.` |
 | `FORGE_AGENTFORGE_SOURCE` | Registry source selection | `auto` |
 | `OPENAI_API_KEY` | OpenAI key | unset |
 | `ANTHROPIC_API_KEY` | Anthropic key | unset |
