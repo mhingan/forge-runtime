@@ -1,31 +1,38 @@
 # Roadmap
 
 ## Runtime foundation
-- [x] Package structure and typed contracts
-- [x] AgentForge local/remote registry adapter
-- [x] Provider protocol and deterministic mock
-- [x] OpenAI/Anthropic optional adapters
-- [x] DAG validation and bounded scheduler
-- [x] SQLite run/task/event store
-- [x] CLI and baseline regression suite
+- [x] Python package structure and typed execution contracts
+- [x] Published AgentForge Toolkit 1.1.0 dependency
+- [x] Read packaged AgentForge catalog via agentforge.core.data_root()
+- [x] Local checkout and GitHub source adapters
+- [x] Map catalog role modes and recommended skills
+- [x] Load engineering rules and workflow Markdown
+- [x] Mock, OpenAI and Anthropic provider interfaces
+- [x] DAG validation and bounded concurrent task scheduling
+- [x] Retries, deadlines, blocked dependency propagation
+- [x] SQLite run, task and event persistence
+- [x] CLI for registry, roles, skills, rules, workflows and runs
+- [x] Optional local FastAPI control API
+- [x] Baseline registry, graph, scheduler and storage tests
 
-## Production control plane
-- [ ] JSON Schema constrained planning and plan-repair strategy
-- [ ] FastAPI run and event API with authentication
-- [ ] PostgreSQL repository and migrations
-- [ ] Durable dispatch queue, leases, cancellation and idempotency
-- [ ] Usage, token-cost budgets, quotas and rate limiting
-- [ ] Semantic evaluators and human review gates
+## Production orchestration
+- [ ] Strict JSON Schema-constrained planner responses and bounded plan repair
+- [ ] Human approval state machine and resume endpoint
+- [ ] PostgreSQL repository and schema migrations
+- [ ] Durable worker queue, leases, cancellation and idempotency
+- [ ] Usage/token cost tracking, budgets and per-project quotas
+- [ ] Semantic evaluation and reviewer-agent quality gates
+- [ ] Run concurrency limits and provider rate-limit backoff
 
-## Execution plane
-- [ ] Capability manifest and tool registry
-- [ ] Ephemeral sandboxed command/file execution
-- [ ] Explicit approval service and audit trail
-- [ ] Artifact store and provenance
-- [ ] Git worktree / patch-based coding agent executor
+## Tool execution
+- [ ] Capability-scoped tool registry and execution contracts
+- [ ] Ephemeral container/VM sandbox for shell and file operations
+- [ ] Git worktree isolation and patch-based code integration
+- [ ] Human-reviewed artifact promotion
+- [ ] Artifact store, checksums and provenance
 
 ## Operator experience
-- [ ] Live dashboard and streamed event timeline
-- [ ] Metrics, traces and provider cost reports
+- [ ] Web dashboard and streamed task event timeline
+- [ ] Provider traces, latency metrics and cost reporting
 - [ ] Evaluation datasets and regression benchmarks
-- [ ] Multi-project and multi-tenant management
+- [ ] Project profiles and multi-tenant administration
