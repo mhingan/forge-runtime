@@ -49,7 +49,7 @@ Each command is run in a newly named, disposable container:
 - CPU, memory, PID count, shared memory, command duration and captured output are bounded.
 - `/tmp` is a bounded tmpfs.
 - No Docker socket, host credentials or host environment variables are forwarded. The container has outbound internet and can also reach destinations routable from the Docker bridge; this is not an egress firewall.
-- Only the sanitized project snapshot is mounted read/write. Existing `node_modules`, when present, is mounted separately as read-only.
+- Only the sanitized project snapshot is transferred to tmpfs. In bridge mode, `node_modules` is a separate writable temporary volume so `npm install` works; in offline mode, an existing local `node_modules` can be mounted read-only.
 
 The host Docker daemon is still a privileged component. The container boundary does not provide a VM-grade security guarantee.
 
@@ -93,7 +93,7 @@ All settings use the `FORGE_` prefix and are shown in `.env.example`.
 | Setting | Default | Description |
 |---|---:|---|
 | `FORGE_SANDBOX_ENABLED` | `true` | Expose command execution to LLM providers |
-| `FORGE_SANDBOX_IMAGE` | `forge-runtime-sandbox:latest` | Already-built local image |
+| `FORGE_SANDBOX_IMAGE` | `forge-runtime-sandbox:internet-v1` | Already-built local image |
 | `FORGE_SANDBOX_NETWORK` | `bridge` | `bridge` enables internet; `none` is offline |
 | `FORGE_SANDBOX_DOCKER_BINARY` | `docker` | Docker CLI path/name |
 | `FORGE_SANDBOX_CPU_LIMIT` | `2` | CPUs per container |
@@ -111,7 +111,7 @@ Set `FORGE_SANDBOX_ENABLED=false` to hide the command tool from model providers.
 
 - Bridge networking provides outbound internet access for dependencies and HTTP clients. It may also allow connections to private/LAN destinations reachable from the host; use `none` for untrusted workloads or add host-level egress filtering where required.
 - The default image includes a common Python/Node toolchain, not every language SDK. Add project-specific dependencies to the trusted Dockerfile and rebuild.
-- Host Python virtual environments are intentionally excluded because native extensions and absolute interpreter paths are not portable into Linux containers.
+- Host Python virtual environments are intentionally excluded because native extensions and absolute interpreter paths are not portable into Linux containers. Use a combined command such as `python -m pip install -r requirements.txt && python -m pytest`; dependency installs are temporary for that invocation.
 - The project `.git` directory is excluded; commands cannot commit or inspect host Git history.
 - File deletion and symlink changes are not propagated back.
 - There is no automatic test-plan approval gate or deployment integration.
