@@ -49,3 +49,42 @@ async def test_loopback_oauth_callback_rejects_provider_denial():
         await writer.wait_closed()
     finally:
         await flow.close()
+
+
+def test_oauth_provider_matches_supported_mcp_sdk_contract():
+    from mcp.client.auth import OAuthClientProvider
+    from mcp.shared.auth import OAuthClientMetadata
+    from pydantic import AnyUrl
+
+    class MemoryStorage:
+        async def get_tokens(self):
+            return None
+
+        async def set_tokens(self, tokens):
+            return None
+
+        async def get_client_info(self):
+            return None
+
+        async def set_client_info(self, client_info):
+            return None
+
+    async def redirect_handler(_url):
+        return None
+
+    async def callback_handler():
+        return "code", "state"
+
+    provider = OAuthClientProvider(
+        server_url="https://mcp.example.com",
+        client_metadata=OAuthClientMetadata(
+            client_name="Forge Runtime",
+            redirect_uris=[AnyUrl("http://127.0.0.1:8765/oauth/callback")],
+            token_endpoint_auth_method="none",
+        ),
+        storage=MemoryStorage(),
+        redirect_handler=redirect_handler,
+        callback_handler=callback_handler,
+        timeout=5.0,
+    )
+    assert isinstance(provider, object)
