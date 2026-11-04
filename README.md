@@ -165,13 +165,13 @@ The model can read and write files through workspace tools. Command execution is
 
 ## Sandboxed command execution
 
-Install and start Docker Desktop or Docker Engine. The first setup builds a local toolchain image; the build downloads its base image and Python packages, but **agent containers have no network access**.
+Install and start Docker Desktop or Docker Engine. The first setup builds a local toolchain image and verifies that the sandbox can reach the internet.
 
 ```bash
 # Check the Docker daemon and configured image
 forge sandbox check
 
-# Build forge-runtime-sandbox:latest once
+# Build forge-runtime-sandbox:internet-v1 once
 forge sandbox build
 
 # Smoke-test the image
@@ -184,7 +184,7 @@ forge sandbox run -- python -m pytest
 
 The LLM providers expose `workspace_run_command`. The tool accepts an argv array, not a raw shell string. Typical commands include `python -m pytest`, `ruff check .`, `mypy`, `npm test`, `node --test` and `make test`. Shells (`bash`/`sh`) are available inside the container for project scripts, but never on the host.
 
-The sandbox runs with networking disabled, a read-only container root filesystem, dropped Linux capabilities, `no-new-privileges`, a non-root UID, PID/CPU/memory limits, an execution timeout and capped output. Only a sanitized temporary copy of the project is mounted. It excludes `.git`, environment secrets, credentials, private keys, dependency folders and common build caches. Existing `node_modules` can be mounted read-only for offline Node.js tests. No host API keys or environment variables are forwarded.
+The sandbox uses Docker bridge networking for internet access, a read-only container root filesystem, dropped Linux capabilities, `no-new-privileges`, a non-root UID, PID/CPU/memory limits, an execution timeout and capped output. It receives a sanitized temporary copy of the project, excluding `.git`, environment secrets, credentials, private keys, dependency folders and common build caches. Existing `node_modules` can be mounted read-only. No host API keys or environment variables are forwarded.
 
 For AgentForge `read-write` roles, newly created or modified regular files are copied back after the command. Deletions and symlinks are not copied back. For `read-only` roles, all container changes are discarded. A failed test command still returns stdout, stderr and its exit code so the agent can diagnose, fix and rerun.
 
@@ -255,7 +255,7 @@ See `.env.example`.
 | `FORGE_DATABASE_URL` | SQLite database URL | `sqlite:///./.forge/forge.db` |
 | `FORGE_WORKSPACE_ROOT` | Project directory visible to the runtime | `.` |
 | `FORGE_SANDBOX_ENABLED` | Expose Docker command tool to LLM agents | `true` |
-| `FORGE_SANDBOX_IMAGE` | Prebuilt local Docker image name | `forge-runtime-sandbox:latest` |
+| `FORGE_SANDBOX_IMAGE` | Prebuilt local Docker image name | `forge-runtime-sandbox:internet-v1` |\n| `FORGE_SANDBOX_NETWORK` | Sandbox network (`bridge` or `none`) | `bridge` |
 | `FORGE_SANDBOX_CPU_LIMIT` / `MEMORY_MB` | Per-container CPU and memory limits | `2` / `2048` |
 | `FORGE_SANDBOX_DEFAULT_TIMEOUT_SECONDS` | Default command timeout | `180` |
 | `FORGE_AGENTFORGE_SOURCE` | Registry source selection | `auto` |
@@ -269,7 +269,7 @@ See `.env.example`.
 - Plans are validated against installed AgentForge role and skill names before any task runs.
 - The scheduler enforces bounded concurrency, retries and timeouts.
 - OpenAI and Anthropic agents can change ordinary files only inside `FORGE_WORKSPACE_ROOT` and only with a `read-write` role; secrets are excluded from workspace tools and sandbox snapshots.
-- Shell/test/build commands run only inside ephemeral offline Docker containers. This is container isolation, not a VM or protection from host-kernel/Docker-daemon vulnerabilities.
+- Shell/test/build commands run only inside ephemeral Docker containers. Bridge mode provides outbound internet and may reach private/LAN destinations accessible from the Docker host. Use `none` for offline tasks. This is container isolation, not a VM or protection from host-kernel/Docker-daemon vulnerabilities.
 - The sandbox does not provide Git commit/push, deployment, browser access or arbitrary MCP tools. Deletions are not copied back.
 - Tasks flagged as requiring human approval are rejected because the approval subsystem is not enabled yet.
 - SQLite is intended for local and single-process use; it is not a distributed job queue.
