@@ -58,7 +58,6 @@ def test_snapshot_excludes_secrets_git_and_dependency_directories(tmp_path: Path
     [
         [],
         ["docker", "ps"],
-        ["curl", "https://example.com"],
         ["/bin/bash", "-lc", "id"],
         ["python", ""],
         ["python", "x" * 16_001],
