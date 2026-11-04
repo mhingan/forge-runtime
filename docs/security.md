@@ -1,29 +1,40 @@
 # Security model
 
-Forge Runtime coordinates model calls using AgentForge content. A user goal, agent profile, skill, workflow, dependency result or model response can contain hostile or misleading instructions. All such content is untrusted.
+User goals, AgentForge profiles, skills, reference files, workflow playbooks, model output and dependency results are untrusted data.
 
 ## Implemented controls
 
-- Registry Markdown is read as content and never executed.
-- Catalog paths are constrained to the registry root; traversal paths are rejected.
-- Plans are validated against known roles and skills before dispatch.
-- DAG cycles, unknown dependencies, duplicate task IDs and oversized plans are rejected.
-- Task count, concurrency, retries, timeouts and output size are bounded.
-- Failed dependency chains are blocked.
-- Tasks requiring human approval are rejected until the approval mechanism is implemented.
-- The HTTP API binds to localhost by default. Network binds require an API token.
+- Registry Markdown is read, never executed.
+- Registry paths are constrained to their selected source root.
+- Plans are checked against known agent/skill catalogs before dispatch.
+- Duplicate task IDs, unknown references, missing dependencies, cycles and plans over 100 tasks are rejected.
+- Tasks requiring human approval are rejected because no approval state machine is enabled.
+- Concurrency, attempts, task timeouts and output lengths are bounded.
+- Workspace tools are confined to FORGE_WORKSPACE_ROOT.
+- Absolute paths, traversal and drive-qualified paths are rejected.
+- Workspace tools exclude dependency/build directories and block secret environment/private-key writes.
+- AgentForge read-only roles do not receive the file-write tool.
+- Tool-call rounds, total tool calls, file sizes and search results are capped.
+- No shell, command execution, network, delete, deployment or arbitrary MCP tool is enabled.
+- HTTP API binds to localhost by default; network binds require an API token.
+
+## Workspace permission model
+
+The runtime maps the AgentForge catalog's default_mode field to tool access:
+- read-only: list, read and search tools.
+- read-write: list, read, search and file-write tools.
+
+This is a role-level capability boundary, not a complete security sandbox. Agent profile instructions and model responses remain untrusted. A model with read-write permission can overwrite ordinary project text files inside the configured workspace. Review changes with version control before accepting them.
 
 ## Not implemented
 
-The current runtime does not provide a shell, filesystem-write, repository-write, browser, deployment or arbitrary MCP executor. Provider adapters have no tools. This is deliberate: installing an AgentForge role does not grant it host permissions.
+There is no shell/process executor, test runner, deletion tool, Git commit/push, browser, deployment or arbitrary MCP integration. Model outputs must never claim these actions were performed. The baseline evaluator checks output presence and size; it is not proof of semantic correctness or security.
 
-## Required before production tools
+## Required before production tool execution
 
-1. Use ephemeral sandboxes with explicit filesystem and network policies.
-2. Give each executor only task-scoped capabilities and short-lived credentials.
-3. Require human approval for destructive, irreversible, financial, production or externally visible effects.
-4. Add tenant isolation and authorization to every run, task and artifact endpoint.
-5. Encrypt sensitive results; define log redaction, retention and deletion controls.
-6. Run prompt-injection tests across registry, planner, hand-off and tool-result boundaries.
-7. Record provenance for tool calls, inputs, outputs, approvals and artifacts.
-8. Add budgets, quotas, rate limits and abuse protection to network-facing endpoints.
+1. Add ephemeral container/VM isolation for command execution.
+2. Add task-level capability manifests and approval for destructive or externally visible actions.
+3. Add authentication and tenant authorization for every run, task and artifact.
+4. Encrypt sensitive artifacts and define retention/deletion controls.
+5. Test prompt injection at registry, planner, hand-off and tool-result boundaries.
+6. Add tool provenance, audit log redaction, quotas, rate limits and provider cost budgets.
