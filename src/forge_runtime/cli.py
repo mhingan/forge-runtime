@@ -41,6 +41,9 @@ def _update_dotenv(path: Path, values: dict[str, str]) -> None:
     """Atomically update selected keys without overwriting unrelated settings."""
     if path.is_symlink():
         raise ValueError(f"Refusing to write through a symlink: {path}")
+    for key, value in values.items():
+        if "\\n" in value or "\\r" in value:
+            raise ValueError(f"Environment value for {key} cannot contain a newline.")
     existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
     pending = dict(values)
     output: list[str] = []
@@ -53,8 +56,6 @@ def _update_dotenv(path: Path, values: dict[str, str]) -> None:
                 continue
         output.append(line)
     for key, value in pending.items():
-        if "\n" in value or "\r" in value:
-            raise ValueError(f"Environment value for {key} cannot contain a newline.")
         output.append(f"{key}={value}")
 
     path.parent.mkdir(parents=True, exist_ok=True)
