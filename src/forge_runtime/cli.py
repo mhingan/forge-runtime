@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import httpx
 import os
 import re
 import shutil
@@ -468,15 +469,43 @@ def mcp_install(
     registry_name: str,
     name: str | None = typer.Option(None, "--name", help="Local connection name."),
 ) -> None:
-    """Add a registry server to the local manifest; it remains disabled until enabled."""
+    """Resolve a registry ID or search term and add the server disabled by default."""
     try:
-        record = MCPRegistry().get(registry_name)
-        connection_name = name or re.sub(r"[^a-zA-Z0-9_.-]", "-", record.name.split("/")[-1]).strip("-").lower()
+        registry = MCPRegistry()
+        try:
+            record = registry.get(registry_name)
+        except httpx.HTTPStatusError as lookup_error:
+            if lookup_error.response.status_code != 404:
+                raise
+            matches = registry.search(registry_name, limit=5)
+            exact = next((item for item in matches if item.name.casefold() == registry_name.casefold()), None)
+            if exact is not None:
+                record = exact
+            elif len(matches) == 1:
+                record = matches[0]
+            elif matches:
+                table = Table("Registry ID", "Version", "Description")
+                for item in matches:
+                    table.add_row(item.name, item.version or "-", item.description[:100])
+                console.print(table)
+                raise ValueError("Multiple servers match that search. Run forge mcp install with the exact Registry ID.")
+            else:
+                raise ValueError(f"No MCP Registry server found for {registry_name!r}.") from lookup_error
+
+        connection_name = name or re.sub(
+            r"[^a-zA-Z0-9_.-]", "-", record.name.split("/")[-1]
+        ).strip("-").lower()
         if not connection_name:
             raise ValueError("Unable to derive a local connection name; pass --name.")
         store = ConnectionStore()
         if record.remotes:
             remote = record.remotes[0]
+            remote_type = remote.get("type") or remote.get("transport")
+            if remote_type not in {"streamable-http", None}:
+                raise ValueError(
+                    f"Remote transport {remote_type!r} is not supported by this Runtime build; "
+                    "use an official Streamable HTTP endpoint or add a compatible server manually."
+                )
             url = remote.get("url")
             if not isinstance(url, str) or not url.startswith("https://"):
                 raise ValueError("Registry remote entry does not provide a secure HTTPS URL.")
@@ -490,12 +519,32 @@ def mcp_install(
             identifier = package.get("identifier")
             if not isinstance(identifier, str) or not identifier:
                 raise ValueError("Registry package has no identifier.")
+
+            def _string_args(field: str) -> tuple[str, ...]:
+                values = package.get(field, []) or []
+                if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+                    raise ValueError(f"Registry package field {field!r} must be a list of strings.")
+                return tuple(values)
+
+            runtime_args = _string_args("runtimeArguments")
+            package_args = _string_args("packageArguments")
+            package_version = package.get("version")
+            if package_version and not isinstance(package_version, str):
+                raise ValueError("Registry package version must be a string.")
             if package_type == "npm":
-                command, args = "npx", ("-y", identifier)
+                package_spec = f"{identifier}@{package_version}" if package_version else identifier
+                args = (*runtime_args, "-y", package_spec, *package_args)
+                command = "npx"
             elif package_type == "pypi":
-                command, args = "uvx", (identifier,)
+                package_spec = f"{identifier}=={package_version}" if package_version else identifier
+                args = (*runtime_args, package_spec, *package_args)
+                command = "uvx"
             elif package_type in {"oci", "docker"}:
-                command, args = "docker", ("run", "--rm", "-i", identifier)
+                image = identifier
+                if package_version and ":" not in image.rsplit("/", 1)[-1]:
+                    image = f"{image}:{package_version}"
+                args = ("run", "--rm", "-i", *runtime_args, image, *package_args)
+                command = "docker"
             else:
                 raise ValueError(
                     f"Package type {package_type!r} is not supported for automatic launch. "
@@ -505,7 +554,9 @@ def mcp_install(
             for variable in package.get("environmentVariables", []) or []:
                 if isinstance(variable, dict):
                     variable_name = variable.get("name") or variable.get("variable")
-                    if isinstance(variable_name, str) and re.fullmatch(r"[A-Z_][A-Z0-9_]*", variable_name):
+                    if isinstance(variable_name, str) and re.fullmatch(
+                        r"[A-Z_][A-Z0-9_]*", variable_name
+                    ):
                         env_refs[variable_name] = f"mcp/{connection_name}/{variable_name}"
             connection = MCPConnection(
                 name=connection_name, transport="stdio", enabled=False,
@@ -513,7 +564,9 @@ def mcp_install(
                 source=f"official-registry:{record.name}",
             )
         else:
-            raise ValueError("This server has no supported package or remote transport in its registry entry.")
+            raise ValueError(
+                "This server has no supported package or remote transport in its registry entry."
+            )
         store.add(connection)
         console.print(f"[green]Added {connection_name}.[/green] It is disabled by default.")
         if connection.env_refs:
@@ -521,9 +574,11 @@ def mcp_install(
             for variable, reference in connection.env_refs.items():
                 console.print(f"  forge auth set {reference}  ({variable})")
         if connection.transport == "stdio":
-            console.print("The first connection may download and execute the package with its package manager.")
+            console.print(
+                "The first connection may download and execute the package with its package manager."
+            )
         console.print(f"Review the publisher and then run: forge mcp enable {connection_name}")
-    except Exception as exc:
+    except (ValueError, OSError, KeyError, httpx.HTTPError) as exc:
         console.print(f"[red]MCP install failed:[/red] {exc}")
         raise typer.Exit(1) from exc
 
