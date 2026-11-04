@@ -228,7 +228,7 @@ See `.env.example`.
 ```bash
 python -m pip install -e ".[dev,api]"
 pytest
-ruff check .
+ruff check . --fix && ruff check .
 ```
 
 See [architecture](docs/architecture.md), [provider contracts](docs/providers.md), [security](docs/security.md), [roadmap](ROADMAP.md) and [contributing](CONTRIBUTING.md).
