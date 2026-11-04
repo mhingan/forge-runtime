@@ -60,3 +60,38 @@ jobs:
         run: |
           forge sandbox run -- python -c "from pathlib import Path; Path('.forge-sandbox-readonly-check').write_text('must-not-escape', encoding='utf-8')"
           test ! -e .forge-sandbox-readonly-check
+
+  package:
+    name: Build PyPI distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install packaging tools
+        run: python -m pip install --upgrade build twine
+      - name: Build wheel and source distribution
+        run: python -m build
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+      - name: Verify bundled sandbox Dockerfile
+        run: |
+          python - <<'PY'
+          import glob
+          import tarfile
+          import zipfile
+
+          wheels = glob.glob("dist/*.whl")
+          sdists = glob.glob("dist/*.tar.gz")
+          assert len(wheels) == 1, f"Expected one wheel, found {wheels}"
+          assert len(sdists) == 1, f"Expected one sdist, found {sdists}"
+          with zipfile.ZipFile(wheels[0]) as wheel:
+              assert "forge_runtime/sandbox_assets/Dockerfile" in wheel.namelist()
+          with tarfile.open(sdists[0], "r:gz") as sdist:
+              assert any(
+                  name.endswith("/src/forge_runtime/sandbox_assets/Dockerfile")
+                  for name in sdist.getnames()
+              )
+          print("Wheel and sdist both contain the sandbox Dockerfile.")
+          PY
