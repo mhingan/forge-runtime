@@ -154,7 +154,7 @@ class OpenAIProvider:
                         arguments,
                         writable=writable,
                     )
-                except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                except (ValueError, TypeError) as exc:
                     result = f"Tool error: invalid arguments: {exc}"
                 used_tools.append(call.function.name)
                 messages.append(
