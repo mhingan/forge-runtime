@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     task_timeout_seconds: int = Field(default=900, ge=1, le=86400)
     sandbox_enabled: bool = True
     sandbox_network: Literal["bridge", "none"] = "bridge"
-    sandbox_image: str = "forge-runtime-sandbox:latest"
+    sandbox_image: str = "forge-runtime-sandbox:internet-v1"
     sandbox_docker_binary: str = "docker"
     sandbox_cpu_limit: float = Field(default=2.0, ge=0.25, le=16)
     sandbox_memory_mb: int = Field(default=2048, ge=256, le=32768)
