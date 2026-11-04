@@ -13,6 +13,7 @@ from forge_runtime.config import Settings
 from forge_runtime.orchestrator import ForgeMaster
 from forge_runtime.providers.factory import create_provider
 from forge_runtime.registry import AgentForgeRegistry, RegistryError
+from forge_runtime.sandbox import DockerSandboxExecutor, SandboxError
 from forge_runtime.storage import SQLiteStore
 
 app = typer.Typer(name="forge", help="Forge Runtime — multi-agent orchestration.")
@@ -22,13 +23,89 @@ skill_cli = typer.Typer(help="Inspect skills.")
 rule_cli = typer.Typer(help="Inspect engineering rules.")
 workflow_cli = typer.Typer(help="Inspect delivery workflows.")
 runs_cli = typer.Typer(help="Inspect orchestration runs.")
+sandbox_cli = typer.Typer(help="Build and operate the isolated Docker command sandbox.")
 app.add_typer(registry_cli, name="registry")
 app.add_typer(agent_cli, name="agent")
 app.add_typer(skill_cli, name="skill")
 app.add_typer(rule_cli, name="rule")
 app.add_typer(workflow_cli, name="workflow")
 app.add_typer(runs_cli, name="runs")
+app.add_typer(sandbox_cli, name="sandbox")
 console = Console()
+
+
+def get_sandbox() -> DockerSandboxExecutor:
+    cfg = Settings()
+    return DockerSandboxExecutor(
+        workspace_root=cfg.workspace_root,
+        image=cfg.sandbox_image,
+        docker_binary=cfg.sandbox_docker_binary,
+        cpu_limit=cfg.sandbox_cpu_limit,
+        memory_mb=cfg.sandbox_memory_mb,
+        pids_limit=cfg.sandbox_pids_limit,
+        default_timeout_seconds=cfg.sandbox_default_timeout_seconds,
+        max_timeout_seconds=cfg.sandbox_max_timeout_seconds,
+        output_chars=cfg.sandbox_output_chars,
+        max_snapshot_files=cfg.sandbox_max_snapshot_files,
+        max_snapshot_bytes=cfg.sandbox_max_snapshot_mb * 1024 * 1024,
+    )
+
+
+@sandbox_cli.command("check")
+def sandbox_check() -> None:
+    executor = get_sandbox()
+    try:
+        status = asyncio.run(executor.check())
+    except SandboxError as exc:
+        console.print(f"[red]Sandbox unavailable:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    console.print(f"[green]Docker Engine:[/green] {status['docker_server_version']}")
+    console.print(f"[bold]Workspace:[/bold] {status['workspace']}")
+    if status["image_available"]:
+        console.print(f"[green]Sandbox image ready:[/green] {status['image']}")
+    else:
+        console.print(f"[yellow]Image missing:[/yellow] {status['image']}")
+        console.print("Run [bold]forge sandbox build[/bold] to build it.")
+
+
+@sandbox_cli.command("build")
+def sandbox_build() -> None:
+    executor = get_sandbox()
+    console.print(f"Building [bold]{executor.image}[/bold]...")
+    try:
+        output = asyncio.run(executor.build_image())
+    except (SandboxError, TimeoutError) as exc:
+        console.print(f"[red]Sandbox image build failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    if output.strip():
+        console.print(output)
+
+
+@sandbox_cli.command("run")
+def sandbox_run(
+    argv: list[str] = typer.Argument(..., help="Allowlisted command and arguments."),
+    timeout_seconds: int | None = typer.Option(None, min=1, max=600),
+    read_write: bool = typer.Option(
+        False,
+        "--read-write",
+        help="Copy modified files back to the project (use only for trusted local runs).",
+    ),
+) -> None:
+    executor = get_sandbox()
+    try:
+        result = asyncio.run(
+            executor.run(
+                argv,
+                writable=read_write,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+    except SandboxError as exc:
+        console.print(f"[red]Sandbox execution failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    console.print_json(json.dumps(result.as_dict(), ensure_ascii=False))
+    if result.exit_code != 0:
+        raise typer.Exit(result.exit_code or 1)
 
 
 def get_registry(path: Path | None = None) -> AgentForgeRegistry:
