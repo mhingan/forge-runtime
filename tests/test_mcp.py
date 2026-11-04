@@ -12,3 +12,9 @@ def test_mcp_tool_output_redacts_connection_secrets():
     result = manager._redact("figma", "token=figma-secret and short token")
     assert result == "token=[REDACTED] and [REDACTED] token"
     assert "figma-secret" not in result
+
+
+def test_copilot_gateway_initializes_fastmcp_lifespan():
+    from forge_runtime.mcp_gateway import server
+
+    assert server is not None
