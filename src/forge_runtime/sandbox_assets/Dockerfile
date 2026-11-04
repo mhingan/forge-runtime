@@ -10,26 +10,31 @@ RUN apt-get update \
         bash \
         build-essential \
         ca-certificates \
+        coreutils \
         git \
         make \
         nodejs \
         npm \
+        tar \
     && rm -rf /var/lib/apt/lists/*
 
+# Keep the in-container toolchain aligned with the supported project ranges.
 RUN python -m pip install --no-cache-dir \
-    pytest \
-    ruff \
-    mypy \
-    coverage \
-    uv \
-    pydantic \
-    pydantic-settings \
-    httpx \
-    typer \
-    rich \
-    fastapi \
-    uvicorn \
-    agentforge-toolkit==1.1.0
+    "pytest>=8,<9" \
+    "pytest-asyncio>=0.23,<2" \
+    "pytest-cov>=5,<8" \
+    "ruff>=0.5" \
+    "mypy>=1.10" \
+    "coverage>=7,<8" \
+    "uv" \
+    "pydantic>=2.7,<3" \
+    "pydantic-settings>=2.2,<3" \
+    "httpx>=0.27,<1" \
+    "typer>=0.12,<1" \
+    "rich>=13.7,<15" \
+    "fastapi>=0.115,<1" \
+    "uvicorn[standard]>=0.30,<1" \
+    "agentforge-toolkit==1.1.0"
 
 ENV HOME=/tmp \
     TMPDIR=/tmp \
@@ -40,5 +45,5 @@ RUN mkdir -p /opt/forge-node_modules
 WORKDIR /workspace
 
 # The runtime overrides UID/GID, drops Linux capabilities, disables networking,
-# mounts the root filesystem read-only and transfers a sanitized project snapshot to tmpfs.
+# and transfers a sanitized snapshot to bounded tmpfs (not a host project bind mount).
 CMD ["python", "--version"]
