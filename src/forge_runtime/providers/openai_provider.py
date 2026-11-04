@@ -212,6 +212,12 @@ class OpenAIProvider:
             if writable
             else "You are read-only; workspace write tools are not available to your role."
         )
+        sandbox_instructions = (
+            "Use workspace_run_command to run tests, linters and build commands in the offline "
+            "Docker sandbox. Pass argv arrays. Only read-write roles can copy command changes back."
+            if self.sandbox is not None
+            else "Command execution is disabled. Do not claim tests or commands were run."
+        )
         prompt = (
             f"Run ID: {request.run_id}\n"
             f"Task contract: {request.task.model_dump_json()}\n"
