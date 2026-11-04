@@ -488,7 +488,7 @@ def mcp_install(
                 for item in matches:
                     table.add_row(item.name, item.version or "-", item.description[:100])
                 console.print(table)
-                raise ValueError("Multiple servers match that search. Run forge mcp install with the exact Registry ID.")
+                raise ValueError("Multiple servers match that search. Run forge mcp install with the exact Registry ID.") from None
             else:
                 raise ValueError(f"No MCP Registry server found for {registry_name!r}.") from lookup_error
 
