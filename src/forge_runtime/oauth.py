@@ -8,7 +8,7 @@ import webbrowser
 from contextlib import asynccontextmanager, suppress
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 from forge_mcp.config import MCPConnection
 from pydantic import AnyUrl
 from forge_runtime.credentials import CredentialVault
@@ -59,7 +59,7 @@ class LoopbackOAuthFlow:
     def __init__(self, timeout_seconds: int = OAUTH_TIMEOUT_SECONDS) -> None:
         self.timeout_seconds = timeout_seconds
         self._server: asyncio.AbstractServer | None = None
-        self._result: asyncio.Future[tuple[str, str | None]] | None = None
+        self._result: asyncio.Future[Any] | None = None
         self.redirect_uri: str | None = None
 
     async def start(self) -> None:
@@ -100,12 +100,15 @@ class LoopbackOAuthFlow:
                 raise RuntimeError("The identity provider denied OAuth authorization.")
             code = (params.get("code") or [""])[0]
             state = (params.get("state") or [None])[0]
+            issuer = (params.get("iss") or [None])[0]
             if not code or not state:
                 raise ValueError("OAuth callback is missing its code or state.")
             future = self._result
             if future is None or future.done():
                 raise ValueError("No OAuth authorization request is awaiting a callback.")
-            future.set_result((code, state))
+            from mcp.client.auth import AuthorizationCodeResult
+
+            future.set_result(AuthorizationCodeResult(code=code, state=state, iss=issuer))
             status = "200 OK"
             body = "Authentication received. You can close this browser tab and return to Forge."
         except Exception:
@@ -148,7 +151,7 @@ class LoopbackOAuthFlow:
             )
             sys.stderr.flush()
 
-    async def callback_handler(self) -> tuple[str, str | None]:
+    async def callback_handler(self):
         if self._result is None:
             raise RuntimeError("OAuth callback listener has not been started.")
         return await asyncio.wait_for(self._result, timeout=self.timeout_seconds)
@@ -185,9 +188,8 @@ async def oauth_http_client(
             storage=KeyringOAuthStorage(vault, connection.name),
             redirect_handler=flow.redirect_handler,
             callback_handler=flow.callback_handler,
-            timeout=flow.timeout_seconds,
         )
-        async with httpx.AsyncClient(auth=provider, timeout=30.0) as client:
+        async with httpx2.AsyncClient(auth=provider, timeout=30.0) as client:
             yield client
     finally:
         await flow.close()
