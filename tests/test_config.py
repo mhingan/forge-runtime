@@ -1,0 +1,22 @@
+from pathlib import Path
+
+from forge_runtime.config import Settings
+
+
+def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "OPENAI_API_KEY=test-openai-key\n"
+        "OPENAI_BASE_URL=https://llm.example.test/v1\n"
+        "ANTHROPIC_API_KEY=test-anthropic-key\n"
+        "FORGE_DEFAULT_PROVIDER=anthropic\n"
+        "FORGE_WORKSPACE_ROOT=.\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.openai_api_key == "test-openai-key"
+    assert settings.openai_base_url == "https://llm.example.test/v1"
+    assert settings.anthropic_api_key == "test-anthropic-key"
+    assert settings.default_provider == "anthropic"
