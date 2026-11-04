@@ -1,10 +1,12 @@
 """Provider factory with lazy, optional SDK imports."""
+from typing import Any
+
 from forge_runtime.config import Settings
 from forge_runtime.providers.mock import MockProvider
 from forge_runtime.sandbox import DockerSandboxExecutor
 
 
-def create_provider(name: str, settings: Settings):
+def create_provider(name: str, settings: Settings, mcp_manager: Any | None = None):
     normalized = name.strip().lower()
     if normalized == "mock":
         return MockProvider()
@@ -34,6 +36,7 @@ def create_provider(name: str, settings: Settings):
             base_url=settings.openai_base_url,
             workspace_root=settings.workspace_root,
             sandbox_executor=sandbox,
+            mcp_manager=mcp_manager,
         )
     if normalized == "anthropic":
         from forge_runtime.providers.anthropic_provider import AnthropicProvider
@@ -42,5 +45,6 @@ def create_provider(name: str, settings: Settings):
             model=settings.anthropic_model,
             workspace_root=settings.workspace_root,
             sandbox_executor=sandbox,
+            mcp_manager=mcp_manager,
         )
     raise ValueError("Unsupported provider. Choose mock, openai, or anthropic.")

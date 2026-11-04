@@ -37,6 +37,15 @@ The project snapshot is sanitized, but project code and dependencies can still b
 
 There is no Git commit/push, deletion propagation, browser, deployment, arbitrary MCP tool, durable approval state machine or tenant-level authorization for all runtime data. The baseline evaluator checks output presence and size; it is not proof of semantic correctness or security.
 
+## MCP connection security
+
+- Newly added connections default to disabled; users must explicitly enable them.
+- Remote endpoints must use HTTPS. Static HTTP credentials are supplied through named OS-keyring references, not literal manifest values. OAuth mode uses the MCP SDK authorization-code/PKCE flow and OS-keyring token storage.
+- STDIO child processes receive a minimal allowlisted environment plus only their own explicitly mapped secrets. Other runtime API keys are not forwarded.
+- MCP tool names are namespaced by connection name; tool output is bounded before being passed to the model.
+- Registry metadata and tool descriptions are untrusted. A registry entry is metadata, not proof that a package is safe.
+- The local Copilot gateway exposes a small management surface and invokes only enabled connections.
+
 ## Required before production use
 
 1. Add a VM/microVM or stronger per-task isolation for hostile multi-tenant workloads.

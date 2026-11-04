@@ -223,6 +223,38 @@ export FORGE_AGENTFORGE_LOCAL_PATH="../agent-forge"
 forge registry validate
 ```
 
+
+## MCP integrations
+
+Forge Runtime connects only servers that the user has explicitly enabled. The connection manifest is stored at ~/.forge/mcp.json; secret values are stored in the operating-system credential vault through Python Keyring.
+
+    forge mcp search figma
+    forge mcp popular --limit 100
+    forge mcp browse --limit 100
+    forge mcp install io.github.publisher/server-name --name figma
+    forge mcp connect figma --scope "files:read"
+    forge mcp list
+    forge run "Inspect the Figma project and implement its main page"
+
+Manual connections are available for other community MCP servers:
+
+    forge mcp add-http my-service https://example.com/mcp --bearer-ref mcp/my-service/token
+    forge mcp add-stdio my-local-server npx --env-ref API_KEY=mcp/my-local-server/API_KEY -- -y @publisher/server
+    forge mcp enable my-service
+
+Remote MCP connections require HTTPS. Run forge mcp connect <name> to start the OAuth 2.1 authorization-code flow with PKCE in the browser; the callback listener binds only to 127.0.0.1. Access/refresh tokens and OAuth client metadata are stored in the operating-system credential vault. For API-key servers, store the key with forge auth set and reference it from the connection manifest. New registry connections remain disabled until explicitly enabled. STDIO MCP commands run as the user's local account and are not isolated by the Docker task sandbox. Review publisher, package, permissions, and scopes before enabling them.
+
+## GitHub Copilot integration
+
+Install the local gateway and a user-level Forge Runner agent profile:
+
+    python -m pip install forge-agent-runtime
+    forge setup --ide copilot
+
+The command preserves other Copilot MCP servers, registers the local stdio gateway in ~/.copilot/mcp-config.json, and installs ~/.copilot/agents/forge-runner.agent.md. Restart Copilot/VS Code and select Forge Runner. The gateway exposes tools for listing connections, discovering registry entries, inspecting tool schemas, and invoking explicitly enabled MCP tools.
+
+The local gateway is an MCP facade, not a hosted service. Keep it bound to the local process and do not expose it over an unauthenticated network.
+
 ## Local HTTP API
 
 Install the API extra and start the service:
@@ -283,7 +315,7 @@ See `.env.example` and [the PyPI publishing guide](docs/publishing.md).
 - The scheduler enforces bounded concurrency, retries and timeouts.
 - OpenAI and Anthropic agents can change ordinary files only inside `FORGE_WORKSPACE_ROOT` and only with a `read-write` role; secrets are excluded from workspace tools and sandbox snapshots.
 - Shell/test/build commands run only inside ephemeral Docker containers. Bridge mode provides outbound internet and may reach private/LAN destinations accessible from the Docker host. Use `none` for offline tasks. This is container isolation, not a VM or protection from host-kernel/Docker-daemon vulnerabilities.
-- The sandbox does not provide Git commit/push, deployment, browser access or arbitrary MCP tools. Deletions are not copied back.
+- The sandbox does not provide Git commit/push, deployment, or browser access. Deletions are not copied back.
 - Tasks flagged as requiring human approval are rejected because the approval subsystem is not enabled yet.
 - SQLite is intended for local and single-process use; it is not a distributed job queue.
 - The baseline evaluator checks output presence and size; it is not a semantic correctness guarantee.

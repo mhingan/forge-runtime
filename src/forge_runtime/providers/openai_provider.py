@@ -23,6 +23,7 @@ class OpenAIProvider:
         base_url: str | None = None,
         workspace_root: Path | str = ".",
         sandbox_executor: DockerSandboxExecutor | None = None,
+        mcp_manager: Any | None = None,
     ) -> None:
         if not api_key:
             raise ValueError("OPENAI_API_KEY is required.")
@@ -125,6 +126,18 @@ class OpenAIProvider:
                 }
                 for tool in self.sandbox.tool_schemas()
             )
+        if self.mcp_manager is not None:
+            tools.extend(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool["name"],
+                        "description": tool["description"][:1000],
+                        "parameters": tool["parameters"],
+                    },
+                }
+                for tool in self.mcp_manager.tool_schemas()
+            )
         return tools
 
     async def _execute_with_tools(
@@ -173,6 +186,8 @@ class OpenAIProvider:
                                 arguments,
                                 writable=writable,
                             )
+                    elif call.function.name.startswith("forge_") and self.mcp_manager is not None:
+                        result = await self.mcp_manager.execute_tool(call.function.name, arguments)
                     else:
                         result = self.workspace.execute_tool(
                             call.function.name,

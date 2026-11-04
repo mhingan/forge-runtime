@@ -22,6 +22,7 @@ class AnthropicProvider:
         model: str = "claude-sonnet-4-5",
         workspace_root: Path | str = ".",
         sandbox_executor: DockerSandboxExecutor | None = None,
+        mcp_manager: Any | None = None,
     ) -> None:
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY is required.")
@@ -35,6 +36,7 @@ class AnthropicProvider:
         self.model = model
         self.workspace = WorkspaceTools(workspace_root)
         self.sandbox = sandbox_executor
+        self.mcp_manager = mcp_manager
 
     async def _complete(self, system: str, prompt: str) -> str:
         response = await self.client.messages.create(
@@ -113,6 +115,15 @@ class AnthropicProvider:
                 }
                 for tool in self.sandbox.tool_schemas()
             )
+        if self.mcp_manager is not None:
+            tools.extend(
+                {
+                    "name": tool["name"],
+                    "description": tool["description"][:1000],
+                    "input_schema": tool["parameters"],
+                }
+                for tool in self.mcp_manager.tool_schemas()
+            )
         return tools
 
     async def _execute_with_tools(
@@ -171,6 +182,8 @@ class AnthropicProvider:
                             arguments,
                             writable=writable,
                         )
+                elif tool_use.name.startswith("forge_") and self.mcp_manager is not None:
+                    result = await self.mcp_manager.execute_tool(tool_use.name, arguments)
                 else:
                     result = self.workspace.execute_tool(
                         tool_use.name,

@@ -389,7 +389,7 @@ class DockerSandboxExecutor:
             "--cpus", str(self.cpu_limit),
             "--shm-size", "64m",
             "--tmpfs", f"/workspace:rw,nosuid,nodev,size={workspace_tmpfs_mb}m,mode=1777",
-            "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m,mode=1777",
+            "--tmpfs", "/tmp:rw,nosuid,nodev,exec,size=512m,mode=1777",
             "--env", "PIP_TARGET=/tmp/python-packages",
             "--env", "PYTHONPATH=/tmp/python-packages",
             "--env", "PIP_CACHE_DIR=/tmp/pip-cache",

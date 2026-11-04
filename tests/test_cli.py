@@ -18,7 +18,7 @@ def test_cli_help_is_available() -> None:
 def test_cli_registry_validation_uses_installed_agentforge() -> None:
     result = runner.invoke(app, ["registry", "validate"])
     assert result.exit_code == 0
-    assert "15 agents" in result.stdout
+    assert "16 agents" in result.stdout
     assert "18 skills" in result.stdout
     assert "agentforge-toolkit:" in result.stdout
 
