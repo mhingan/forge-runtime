@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     workspace_root: Path = Path(".")
     max_parallel_tasks: int = Field(default=4, ge=1, le=64)
     task_timeout_seconds: int = Field(default=900, ge=1, le=86400)
+    sandbox_enabled: bool = True
+    sandbox_image: str = "forge-runtime-sandbox:latest"
+    sandbox_docker_binary: str = "docker"
+    sandbox_cpu_limit: float = Field(default=2.0, ge=0.25, le=16)
+    sandbox_memory_mb: int = Field(default=2048, ge=256, le=32768)
+    sandbox_pids_limit: int = Field(default=128, ge=32, le=2048)
+    sandbox_default_timeout_seconds: int = Field(default=180, ge=1, le=600)
+    sandbox_max_timeout_seconds: int = Field(default=600, ge=1, le=600)
+    sandbox_output_chars: int = Field(default=24000, ge=1000, le=100000)
+    sandbox_max_snapshot_files: int = Field(default=5000, ge=1, le=50000)
+    sandbox_max_snapshot_mb: int = Field(default=512, ge=1, le=4096)
     default_provider: str = "mock"
     agentforge_repository: str = "https://github.com/mhingan/agent-forge"
     agentforge_ref: str = "main"
