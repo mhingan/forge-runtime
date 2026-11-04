@@ -442,6 +442,119 @@ class DockerSandboxExecutor:
                 truncated = True
         return bytes(output), truncated
 
+    async def _copy_container_workspace(
+        self,
+        container_name: str,
+        destination: Path,
+    ) -> None:
+        """Stream container workspace tar data and safely extract regular files."""
+        process = await asyncio.create_subprocess_exec(
+            self.docker_binary,
+            "exec",
+            container_name,
+            "tar",
+            "-cf",
+            "-",
+            "-C",
+            "/workspace",
+            ".",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        assert process.stdout is not None
+        assert process.stderr is not None
+        archive_path: Path | None = None
+
+        async def save_archive() -> None:
+            nonlocal archive_path
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=".forge-output-",
+                suffix=".tar",
+                dir=destination.parent,
+                delete=False,
+            ) as archive:
+                archive_path = Path(archive.name)
+                while chunk := await process.stdout.read(1024 * 1024):
+                    archive.write(chunk)
+
+        stdout_task = asyncio.create_task(save_archive())
+        stderr_task = asyncio.create_task(process.stderr.read())
+        try:
+            _, stderr_data, _ = await asyncio.wait_for(
+                asyncio.gather(stdout_task, stderr_task, process.wait()),
+                timeout=120,
+            )
+        except TimeoutError as exc:
+            process.kill()
+            await process.wait()
+            for task in (stdout_task, stderr_task):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(stdout_task, stderr_task, return_exceptions=True)
+            raise SandboxError("Timed out while exporting the sandbox workspace.") from exc
+        except OSError as exc:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+            raise SandboxError(f"Could not export sandbox workspace: {exc}") from exc
+
+        try:
+            if process.returncode != 0:
+                detail = stderr_data.decode("utf-8", errors="replace").strip()
+                raise SandboxError(f"Could not export sandbox workspace: {detail}")
+
+            if archive_path is None:
+                raise SandboxError("Docker did not return a workspace archive.")
+
+            total_bytes = 0
+            file_count = 0
+            with tarfile.open(archive_path, mode="r:") as archive:
+                for member in archive:
+                    member_path = PurePosixPath(member.name)
+                    if member_path.is_absolute() or any(
+                        part == ".." for part in member_path.parts
+                    ):
+                        raise SandboxError(
+                            f"Sandbox returned an unsafe path: {member.name!r}"
+                        )
+                    parts = tuple(part for part in member_path.parts if part not in {"", "."})
+                    if not parts:
+                        continue
+                    relative = Path(*parts)
+                    if self._is_excluded(relative):
+                        continue
+                    target = destination / relative
+                    if member.isdir():
+                        target.mkdir(parents=True, exist_ok=True)
+                        continue
+                    if not member.isfile():
+                        # Never propagate symlinks, hard links, devices or other special files.
+                        continue
+                    if member.size > self.MAX_SINGLE_FILE_BYTES:
+                        raise SandboxError(
+                            f"Sandbox output file {relative.as_posix()} exceeds the per-file limit."
+                        )
+                    file_count += 1
+                    total_bytes += member.size
+                    if file_count > self.max_snapshot_files:
+                        raise SandboxError(
+                            f"Sandbox output exceeds the {self.max_snapshot_files}-file limit."
+                        )
+                    if total_bytes > self.max_snapshot_bytes:
+                        raise SandboxError("Sandbox output exceeds the workspace size limit.")
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    source = archive.extractfile(member)
+                    if source is None:
+                        continue
+                    with source, target.open("wb") as output:
+                        shutil.copyfileobj(source, output)
+                    target.chmod(member.mode & 0o755)
+        finally:
+            if archive_path is not None:
+                with contextlib.suppress(OSError):
+                    archive_path.unlink()
+
     async def _run_container(
         self,
         snapshot: Path,
@@ -563,16 +676,10 @@ class DockerSandboxExecutor:
                 stderr_data += b"\\nForge Runtime: command timed out and was stopped."
 
             if not host_timed_out:
-                # Copy into a fresh directory so deleted container files are detectable.
+                # Export into a fresh directory so deleted container files are detectable.
                 output_snapshot = snapshot.with_name("sandbox-output")
                 output_snapshot.mkdir()
-                await self._run_control(
-                    self.docker_binary,
-                    "cp",
-                    f"{container_name}:/workspace/.",
-                    str(output_snapshot),
-                    timeout_seconds=120,
-                )
+                await self._copy_container_workspace(container_name, output_snapshot)
                 shutil.rmtree(snapshot)
                 output_snapshot.rename(snapshot)
             return (
