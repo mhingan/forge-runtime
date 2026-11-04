@@ -137,7 +137,7 @@ python -m pip install -e ".[openai]"
 python -m pip install -e ".[anthropic]"
 ```
 
-The LLM providers plan and generate task outputs, but they do not have host tools. They must not claim to have modified files, run tests or deployed software.
+The LLM providers have bounded workspace and Docker command tools, but no direct host shell or deployment access. Their command execution runs in disposable containers.
 
 ## Workspace access for coding tasks
 
@@ -184,7 +184,7 @@ forge sandbox run -- python -m pytest
 
 The LLM providers expose `workspace_run_command`. The tool accepts an argv array, not a raw shell string. Typical commands include `python -m pytest`, `ruff check .`, `mypy`, `npm test`, `node --test` and `make test`. Shells (`bash`/`sh`) are available inside the container for project scripts, but never on the host.
 
-The sandbox uses Docker bridge networking for internet access, a read-only container root filesystem, dropped Linux capabilities, `no-new-privileges`, a non-root UID, PID/CPU/memory limits, an execution timeout and capped output. It receives a sanitized temporary copy of the project, excluding `.git`, environment secrets, credentials, private keys, dependency folders and common build caches. Existing `node_modules` can be mounted read-only. No host API keys or environment variables are forwarded.
+The sandbox uses Docker bridge networking for internet access, a read-only container root filesystem, dropped Linux capabilities, `no-new-privileges`, a non-root UID, PID/CPU/memory limits, an execution timeout and capped output. It receives a sanitized temporary copy of the project, excluding `.git`, environment secrets, credentials, private keys, dependency folders and common build caches. With internet enabled, `node_modules` is a temporary writable volume for package installation; in offline mode, an existing local `node_modules` may be mounted read-only. No host API keys or environment variables are forwarded.
 
 For AgentForge `read-write` roles, newly created or modified regular files are copied back after the command. Deletions and symlinks are not copied back. For `read-only` roles, all container changes are discarded. A failed test command still returns stdout, stderr and its exit code so the agent can diagnose, fix and rerun.
 
