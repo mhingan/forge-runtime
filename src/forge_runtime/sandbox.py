@@ -356,7 +356,7 @@ class DockerSandboxExecutor:
                             pass
 
         args = [
-            "run", "--rm", "--name", container_name,
+            "run", "--rm", "--pull=never", "--name", container_name,
             "--network", "none",
             "--read-only",
             "--cap-drop", "ALL",
@@ -536,7 +536,12 @@ class DockerSandboxExecutor:
             )
         except FileNotFoundError as exc:
             raise SandboxError("Docker CLI was not found on PATH.") from exc
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15)
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15)
+        except TimeoutError as exc:
+            process.kill()
+            await process.communicate()
+            raise SandboxError("Timed out while checking Docker Engine.") from exc
         if process.returncode != 0:
             detail = stderr.decode("utf-8", errors="replace").strip()
             raise SandboxError(f"Docker Engine is unavailable: {detail}")
@@ -546,7 +551,12 @@ class DockerSandboxExecutor:
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        await asyncio.wait_for(image_process.wait(), timeout=15)
+        try:
+            await asyncio.wait_for(image_process.wait(), timeout=15)
+        except TimeoutError as exc:
+            image_process.kill()
+            await image_process.wait()
+            raise SandboxError("Timed out while checking the sandbox image.") from exc
         return {
             "docker_server_version": version,
             "image": self.image,
@@ -578,9 +588,14 @@ class DockerSandboxExecutor:
             )
         except FileNotFoundError as exc:
             raise SandboxError("Docker CLI was not found on PATH.") from exc
-        output, _ = await asyncio.wait_for(
-            process.communicate(), timeout=30 * 60
-        )
+        try:
+            output, _ = await asyncio.wait_for(
+                process.communicate(), timeout=30 * 60
+            )
+        except TimeoutError as exc:
+            process.kill()
+            await process.communicate()
+            raise SandboxError("Sandbox image build exceeded the 30-minute timeout.") from exc
         text = output.decode("utf-8", errors="replace")
         if process.returncode != 0:
             raise SandboxError(text[-self.output_chars * 2 :])
