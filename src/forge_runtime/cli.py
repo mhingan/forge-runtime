@@ -605,6 +605,60 @@ def mcp_install(
         raise typer.Exit(1) from exc
 
 
+@mcp_cli.command("connect")
+def mcp_connect(
+    name: str,
+    scope: str | None = typer.Option(None, "--scope", help="Optional OAuth scope string."),
+) -> None:
+    """Authorize a remote MCP server through browser-based OAuth 2.1 with PKCE."""
+    store = ConnectionStore()
+    try:
+        connection = store.load().get(name)
+        if connection is None:
+            raise ValueError(f"Unknown MCP connection: {name}")
+        if connection.transport != "http":
+            raise ValueError("OAuth browser login is supported only for remote Streamable HTTP MCP servers.")
+        if connection.header_refs:
+            raise ValueError("This connection already uses static HTTP credentials. Remove those references before switching to OAuth.")
+        if not typer.confirm(
+            f"Open the identity provider to authorize MCP server {name!r}?",
+            default=False,
+        ):
+            console.print("OAuth connection cancelled.")
+            return
+        values = connection.to_dict()
+        values["auth_mode"] = "oauth"
+        values["enabled"] = True
+        if scope is not None:
+            values["oauth_scope"] = scope
+        updated = MCPConnection.from_dict(name, values)
+        store.add(updated, replace=True)
+
+        async def _connect():
+            async with MCPManager(store=store) as manager:
+                status = manager.status()
+                if name not in status["connected_servers"]:
+                    detail = next(
+                        (item for item in status["startup_errors"] if item.startswith(f"{name}:")),
+                        "The MCP server did not complete initialization.",
+                    )
+                    raise RuntimeError(detail)
+                return len([item for item in manager.list_tools() if item["server"] == name])
+
+        try:
+            tool_count = asyncio.run(_connect())
+        except Exception:
+            store.set_enabled(name, False)
+            raise
+        console.print(
+            f"[green]Connected {name} with OAuth.[/green] "
+            f"Discovered {tool_count} tool(s). Tokens are stored in the OS credential vault."
+        )
+    except Exception as exc:
+        console.print(f"[red]OAuth connection failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+
 @mcp_cli.command("add-http")
 def mcp_add_http(
     name: str,
@@ -614,7 +668,7 @@ def mcp_add_http(
 ) -> None:
     try:
         header_refs = {"Authorization": bearer_ref} if bearer_ref else {}
-        ConnectionStore().add(MCPConnection(name=name, transport="http", enabled=enable, url=url, header_refs=header_refs))
+        ConnectionStore().add(MCPConnection(name=name, transport="http", enabled=enable, url=url, auth_mode="bearer" if bearer_ref else "none", header_refs=header_refs))
         console.print(f"Added {name} ({'enabled' if enable else 'disabled'}).")
     except Exception as exc:
         console.print(f"[red]{exc}[/red]")
@@ -741,6 +795,9 @@ def auth_list() -> None:
         for connection in ConnectionStore().load().values():
             references.update((connection.env_refs or {}).values())
             references.update((connection.header_refs or {}).values())
+            if connection.auth_mode == "oauth":
+                references.add(f"mcp/{connection.name}/oauth/tokens")
+                references.add(f"mcp/{connection.name}/oauth/client")
         if not references:
             console.print("No credential references are configured.")
             return
