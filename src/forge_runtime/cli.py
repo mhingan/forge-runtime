@@ -584,7 +584,19 @@ def mcp_list() -> None:
 @mcp_cli.command("enable")
 def mcp_enable(name: str) -> None:
     try:
-        ConnectionStore().set_enabled(name, True)
+        store = ConnectionStore()
+        connection = store.load().get(name)
+        if connection is None:
+            raise ValueError(f"Unknown MCP connection: {name}")
+        if connection.transport == "stdio":
+            console.print(
+                "[yellow]Security notice:[/yellow] enabling this STDIO server allows its local "
+                "process to execute as your user. It is not isolated by the Docker task sandbox."
+            )
+        if not typer.confirm(f"Enable MCP connection {name!r}?", default=False):
+            console.print("Enable cancelled.")
+            return
+        store.set_enabled(name, True)
         console.print(f"[green]{name} enabled.[/green] Its tools will be available on the next Forge run.")
     except Exception as exc:
         console.print(f"[red]{exc}[/red]")
