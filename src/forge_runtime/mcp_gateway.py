@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from forge_mcp.popular import popular_servers, popularity_metadata
 from forge_mcp.registry import MCPRegistry
 from mcp.server.fastmcp import FastMCP
 
@@ -184,6 +185,15 @@ async def forge_reload_connections() -> dict[str, Any]:
         await _manager_instance.close()
         _manager_instance = None
     return (await _get_manager()).status()
+
+
+@server.tool()
+def forge_list_popular_servers(limit: int = 100) -> dict[str, Any]:
+    """List the curated popular MCP discovery snapshot and its ranking methodology."""
+    return {
+        "metadata": popularity_metadata(),
+        "servers": popular_servers(limit),
+    }
 
 
 @server.tool()
