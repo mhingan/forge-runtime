@@ -1,20 +1,29 @@
-# Security and trust model
+# Security model
 
-All user goals, agent profiles, skills, model responses, dependency outputs and future tool results are untrusted.
+Forge Runtime coordinates model calls using AgentForge content. A user goal, agent profile, skill, workflow, dependency result or model response can contain hostile or misleading instructions. All such content is untrusted.
 
-## Implemented boundaries
-- Markdown registry content is read, not executed.
-- Registry roles do not grant runtime permissions.
-- No arbitrary shell, filesystem write, repository write, browser, deployment or MCP tools are exposed.
-- API credentials are obtained from environment variables.
-- Planner outputs are parsed and graph-validated before dispatch.
-- Task count, concurrency, attempts, timeouts and output lengths are bounded.
+## Implemented controls
 
-## Before tool execution is enabled
-1. Use ephemeral sandboxes with explicit filesystem and network policy.
-2. Grant tools per-task capabilities, never broad ambient permissions.
-3. Require human approval for destructive, irreversible, production, financial or externally visible effects.
-4. Add authentication, tenant isolation, quotas, rate limits and audit retention before a hosted API.
-5. Encrypt sensitive artifacts and define retention/deletion controls.
-6. Test prompt injection through registry, task hand-off and tool-result contexts.
-7. Record provenance for tools, inputs, outputs and approvals.
+- Registry Markdown is read as content and never executed.
+- Catalog paths are constrained to the registry root; traversal paths are rejected.
+- Plans are validated against known roles and skills before dispatch.
+- DAG cycles, unknown dependencies, duplicate task IDs and oversized plans are rejected.
+- Task count, concurrency, retries, timeouts and output size are bounded.
+- Failed dependency chains are blocked.
+- Tasks requiring human approval are rejected until the approval mechanism is implemented.
+- The HTTP API binds to localhost by default. Network binds require an API token.
+
+## Not implemented
+
+The current runtime does not provide a shell, filesystem-write, repository-write, browser, deployment or arbitrary MCP executor. Provider adapters have no tools. This is deliberate: installing an AgentForge role does not grant it host permissions.
+
+## Required before production tools
+
+1. Use ephemeral sandboxes with explicit filesystem and network policies.
+2. Give each executor only task-scoped capabilities and short-lived credentials.
+3. Require human approval for destructive, irreversible, financial, production or externally visible effects.
+4. Add tenant isolation and authorization to every run, task and artifact endpoint.
+5. Encrypt sensitive results; define log redaction, retention and deletion controls.
+6. Run prompt-injection tests across registry, planner, hand-off and tool-result boundaries.
+7. Record provenance for tool calls, inputs, outputs, approvals and artifacts.
+8. Add budgets, quotas, rate limits and abuse protection to network-facing endpoints.
