@@ -206,6 +206,7 @@ class DockerSandboxExecutor:
         changed: list[str] = []
         deleted: list[str] = []
         seen: set[str] = set()
+        total_bytes = 0
         for base, dirs, files in os.walk(snapshot, followlinks=False):
             base_path = Path(base)
             relative_dir = base_path.relative_to(snapshot)
@@ -225,8 +226,17 @@ class DockerSandboxExecutor:
                 except OSError:
                     continue
                 if size > self.MAX_SINGLE_FILE_BYTES:
-                    continue
+                    raise SandboxError(
+                        f"Sandbox output file {key} exceeds the per-file size limit."
+                    )
                 seen.add(key)
+                total_bytes += size
+                if len(seen) > self.max_snapshot_files:
+                    raise SandboxError(
+                        f"Sandbox output exceeds the {self.max_snapshot_files}-file limit."
+                    )
+                if total_bytes > self.max_snapshot_bytes:
+                    raise SandboxError("Sandbox output exceeds the workspace size limit.")
                 current_hash = self._hash_file(item)
                 if baseline.get(key) != current_hash:
                     changed.append(key)
