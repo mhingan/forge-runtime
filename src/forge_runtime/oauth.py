@@ -59,7 +59,7 @@ class LoopbackOAuthFlow:
     def __init__(self, timeout_seconds: int = OAUTH_TIMEOUT_SECONDS) -> None:
         self.timeout_seconds = timeout_seconds
         self._server: asyncio.AbstractServer | None = None
-        self._result: asyncio.Future[Any] | None = None
+        self._result: asyncio.Future[AuthorizationCodeResult] | None = None
         self.redirect_uri: str | None = None
 
     async def start(self) -> None:
@@ -106,8 +106,6 @@ class LoopbackOAuthFlow:
             future = self._result
             if future is None or future.done():
                 raise ValueError("No OAuth authorization request is awaiting a callback.")
-            from mcp.client.auth import AuthorizationCodeResult
-
             future.set_result(AuthorizationCodeResult(code=code, state=state, iss=issuer))
             status = "200 OK"
             body = "Authentication received. You can close this browser tab and return to Forge."
@@ -151,7 +149,7 @@ class LoopbackOAuthFlow:
             )
             sys.stderr.flush()
 
-    async def callback_handler(self):
+    async def callback_handler(self) -> AuthorizationCodeResult:
         if self._result is None:
             raise RuntimeError("OAuth callback listener has not been started.")
         return await asyncio.wait_for(self._result, timeout=self.timeout_seconds)
