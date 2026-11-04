@@ -1,7 +1,7 @@
 """Ephemeral Docker-based command execution for agent tasks.
 
-Commands run in a disposable, offline, unprivileged container against a sanitized
-workspace snapshot. Only changed regular files are copied back, and only for
+Commands run in a disposable, unprivileged container with configurable network access
+against a sanitized workspace snapshot. Only changed regular files are copied back, and only for
 AgentForge roles with read-write permission.
 """
 from __future__ import annotations
@@ -56,7 +56,7 @@ class DockerSandboxExecutor:
         "tox", "nox", "uv", "pip", "pip3", "npm", "npx", "node", "git",
         "make", "cmake", "gcc", "g++", "clang", "go", "cargo", "rustc",
         "java", "javac", "mvn", "gradle", "php", "composer", "ruby", "bundle",
-        "rspec", "dart", "flutter",
+        "rspec", "dart", "flutter", "curl", "wget",
     }
     MAX_ARGS = 64
     MAX_ARGUMENT_CHARS = 16_000
@@ -86,6 +86,7 @@ class DockerSandboxExecutor:
         default_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
         max_timeout_seconds: int = MAX_TIMEOUT_SECONDS,
         output_chars: int = DEFAULT_OUTPUT_CHARS,
+        network: str = "bridge",
         max_snapshot_files: int = MAX_SNAPSHOT_FILES,
         max_snapshot_bytes: int = MAX_SNAPSHOT_BYTES,
     ) -> None:
@@ -94,6 +95,8 @@ class DockerSandboxExecutor:
             raise SandboxError("Sandbox image name contains unsupported characters.")
         if not docker_binary or any(char.isspace() for char in docker_binary):
             raise SandboxError("Docker binary must be a single executable name or path.")
+        if network not in {"bridge", "none"}:
+            raise SandboxError("Sandbox network must be bridge (internet) or none (offline).")
         if not 0.25 <= cpu_limit <= 16:
             raise SandboxError("Sandbox CPU limit must be between 0.25 and 16.")
         if not 256 <= memory_mb <= 32768:
@@ -116,6 +119,7 @@ class DockerSandboxExecutor:
         self.default_timeout_seconds = default_timeout_seconds
         self.max_timeout_seconds = max_timeout_seconds
         self.output_chars = output_chars
+        self.network = network
         self.max_snapshot_files = max_snapshot_files
         self.max_snapshot_bytes = max_snapshot_bytes
 
@@ -323,7 +327,8 @@ class DockerSandboxExecutor:
                 "name": "workspace_run_command",
                 "description": (
                     "Run a developer/test command in an ephemeral Docker sandbox. "
-                    "Network is disabled, the filesystem is isolated to a sanitized project "
+                    f"Network mode is {self.network}; bridge mode enables internet access. "
+                    "The filesystem is isolated to a sanitized project "
                     "snapshot, and CPU/memory/process/time limits are enforced. Use argv as "
                     "an array (not a shell command string). Changes are copied back only for "
                     "read-write roles. Common commands: python -m pytest, pytest, ruff check ., "
@@ -373,7 +378,7 @@ class DockerSandboxExecutor:
         workspace_tmpfs_mb = self.max_snapshot_bytes // (1024 * 1024) + 256
         args = [
             "--name", container_name,
-            "--network", "none",
+            "--network", self.network,
             "--read-only",
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
