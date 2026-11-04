@@ -66,10 +66,10 @@ def test_secret_files_are_hidden_and_cannot_be_read_or_searched(tmp_path: Path) 
     (tmp_path / ".env.example").write_text("API_KEY=replace-me", encoding="utf-8")
     tools = WorkspaceTools(tmp_path)
 
-    visible = tools.list_files()
-    assert ".env" not in visible
-    assert "credentials.json" not in visible
-    assert ".env.example" in visible
+    visible_names = {line.rstrip("/") for line in tools.list_files().splitlines()}
+    assert ".env" not in visible_names
+    assert "credentials.json" not in visible_names
+    assert ".env.example" in visible_names
 
     with pytest.raises(WorkspaceError, match="protected"):
         tools.read_file(".env")
