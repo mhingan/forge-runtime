@@ -48,10 +48,10 @@ def test_setup_rejects_unknown_provider_without_touching_docker() -> None:
 def test_dotenv_update_preserves_existing_values_and_restricts_permissions(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "# keep this comment\\n"
-        "FORGE_DEFAULT_PROVIDER=mock\\n"
-        "OPENAI_API_KEY=old-key\\n"
-        "CUSTOM_SETTING=keep-me\\n",
+        "# keep this comment\n"
+        "FORGE_DEFAULT_PROVIDER=mock\n"
+        "OPENAI_API_KEY=old-key\n"
+        "CUSTOM_SETTING=keep-me\n",
         encoding="utf-8",
     )
 
