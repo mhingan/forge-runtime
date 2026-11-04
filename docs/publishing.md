@@ -4,23 +4,23 @@ The distribution name is `forge-agent-runtime`. The import package is `forge_run
 
 ## One-time PyPI setup
 
-The repository is configured to publish through PyPI Trusted Publishing. This uses GitHub Actions OIDC and does not require a long-lived PyPI API token in GitHub Secrets.
+The package metadata credits **Mihaita Hingan** as its author. The first successful Trusted Publishing release will also associate the PyPI project with the publishing account **`mihaita.hingan`**. GitHub Actions OIDC is used, so no long-lived PyPI API token is stored in GitHub Secrets.
 
-1. Sign in to PyPI with the account that should own the project.
+1. Sign in to PyPI using the account **`mihaita.hingan`**. This is the PyPI publisher account; it is not the GitHub repository owner.
 2. Open **Account settings → Publishing** and add a **pending publisher** for a new project.
 3. Enter these exact values:
 
    | Field | Value |
    |---|---|
    | PyPI project name | `forge-agent-runtime` |
-   | Owner | `mhingan` |
+   | Owner | `mhingan` (GitHub owner; do not enter the PyPI username here) |
    | Repository | `forge-runtime` |
    | Workflow filename | `.github/workflows/publish.yml` |
    | Environment | `pypi` |
 
 4. In GitHub, open **mhingan/forge-runtime → Settings → Environments** and create an environment named `pypi`. Optionally add required reviewers to approve releases before publishing.
 
-A pending publisher is the supported PyPI flow for creating a new project through Trusted Publishing. The name is not reserved until the first successful publication, so complete the setup and release promptly after confirming availability.
+A pending publisher is the supported PyPI flow for creating a new project through Trusted Publishing. The `authors` metadata in `pyproject.toml` displays **Mihaita Hingan** in the package credits; the first publication from the `mihaita.hingan` PyPI account associates that account with project ownership/maintenance. The project name is not reserved until the first successful publication, so complete setup and release promptly after confirming availability.
 
 Official PyPI instructions:
 - [Create a project with a pending Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
