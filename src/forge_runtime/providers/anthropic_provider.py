@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from forge_mcp import MCPToolBridge
+
 from forge_runtime.models import AgentRequest, AgentResult, ExecutionPlan
 from forge_runtime.sandbox import DockerSandboxExecutor
 from forge_runtime.workspace import WorkspaceTools
@@ -22,6 +24,7 @@ class AnthropicProvider:
         model: str = "claude-sonnet-4-5",
         workspace_root: Path | str = ".",
         sandbox_executor: DockerSandboxExecutor | None = None,
+        mcp_bridge: MCPToolBridge | None = None,
     ) -> None:
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY is required.")
@@ -35,6 +38,7 @@ class AnthropicProvider:
         self.model = model
         self.workspace = WorkspaceTools(workspace_root)
         self.sandbox = sandbox_executor
+        self.mcp_bridge = mcp_bridge
 
     async def _complete(self, system: str, prompt: str) -> str:
         response = await self.client.messages.create(
@@ -95,7 +99,7 @@ class AnthropicProvider:
         except Exception as exc:
             raise RuntimeError(f"Planner returned invalid JSON: {exc}") from exc
 
-    def _tool_definitions(self, *, writable: bool) -> list[dict[str, Any]]:
+    async def _tool_definitions(self, *, writable: bool) -> list[dict[str, Any]]:
         tools = [
             {
                 "name": tool["name"],
@@ -113,6 +117,15 @@ class AnthropicProvider:
                 }
                 for tool in self.sandbox.tool_schemas()
             )
+        if self.mcp_bridge is not None:
+            tools.extend(
+                {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "input_schema": tool["parameters"],
+                }
+                for tool in await self.mcp_bridge.tool_schemas()
+            )
         return tools
 
     async def _execute_with_tools(
@@ -122,7 +135,7 @@ class AnthropicProvider:
         prompt: str,
     ) -> tuple[str, list[str]]:
         writable = request.agent.mode == "read-write"
-        tools = self._tool_definitions(writable=writable)
+        tools = await self._tool_definitions(writable=writable)
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
         used_tools: list[str] = []
         tool_call_count = 0
@@ -171,6 +184,14 @@ class AnthropicProvider:
                             arguments,
                             writable=writable,
                         )
+                elif tool_use.name.startswith("mcp_") and self.mcp_bridge is not None:
+                    try:
+                        result = await self.mcp_bridge.execute_tool(
+                            tool_use.name,
+                            arguments,
+                        )
+                    except Exception as exc:
+                        result = f"MCP tool failed ({type(exc).__name__}). Check the connector status."
                 else:
                     result = self.workspace.execute_tool(
                         tool_use.name,
