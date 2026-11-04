@@ -10,6 +10,9 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
         "OPENAI_BASE_URL=https://llm.example.test/v1\n"
         "ANTHROPIC_API_KEY=test-anthropic-key\n"
         "FORGE_DEFAULT_PROVIDER=anthropic\n"
+        "FORGE_SANDBOX_ENABLED=true\n"
+        "FORGE_SANDBOX_IMAGE=forge-test-sandbox:latest\n"
+        "FORGE_SANDBOX_MEMORY_MB=1024\n"
         "FORGE_WORKSPACE_ROOT=.\n",
         encoding="utf-8",
     )
@@ -20,3 +23,6 @@ def test_provider_credentials_and_base_url_load_from_dotenv(tmp_path: Path) -> N
     assert settings.openai_base_url == "https://llm.example.test/v1"
     assert settings.anthropic_api_key == "test-anthropic-key"
     assert settings.default_provider == "anthropic"
+    assert settings.sandbox_enabled is True
+    assert settings.sandbox_image == "forge-test-sandbox:latest"
+    assert settings.sandbox_memory_mb == 1024
