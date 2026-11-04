@@ -96,7 +96,7 @@ async def test_read_write_agent_applies_only_safe_sandbox_changes(tmp_path: Path
     assert (root / "src" / "app.py").read_text(encoding="utf-8") == "print('updated')\n"
     assert (root / "new.py").read_text(encoding="utf-8") == "VALUE = 42\n"
     assert (root / ".env").read_text(encoding="utf-8") == "API_KEY=secret\n"
-    assert not (root / ".git" / "config").read_text(encoding="utf-8") == "credential=secret"
+    assert (root / ".git" / "config").read_text(encoding="utf-8") != "credential=secret"
 
 
 @pytest.mark.asyncio
